@@ -23,6 +23,7 @@ jobs:
 
   android-debug:
     runs-on: ubuntu-latest
+    if: ${{ vars.VITE_API_BASE_URL != '' }}
     env:
       VITE_API_BASE_URL: ${{ vars.VITE_API_BASE_URL }}
       VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
@@ -50,6 +51,7 @@ jobs:
 
   ios-simulator:
     runs-on: macos-15
+    if: ${{ vars.VITE_API_BASE_URL != '' }}
     env:
       VITE_API_BASE_URL: ${{ vars.VITE_API_BASE_URL }}
       VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
