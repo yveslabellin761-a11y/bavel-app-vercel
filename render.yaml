@@ -2,7 +2,7 @@ services:
   - type: web
     name: bavel-api
     runtime: node
-    plan: starter
+    plan: free
     buildCommand: npm ci --include=dev && npm run build
     startCommand: npm start
     healthCheckPath: /health
