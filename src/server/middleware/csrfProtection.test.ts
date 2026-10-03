@@ -49,6 +49,7 @@ test('allows mutations from the explicit Capacitor iOS origin', async () => {
 test('allows credentialed CORS only for the configured site and native app origins', async () => {
   const app = express();
   app.use(createClientCors('https://bavel.example'));
+  app.get('/api/ai/status', (_req, res) => res.json({ ready: false }));
   app.options('/api/action', (_req, res) => res.sendStatus(204));
   const server = app.listen(0, '127.0.0.1');
   servers.push(server);
@@ -68,6 +69,9 @@ test('allows credentialed CORS only for the configured site and native app origi
       'access-control-request-headers': 'authorization,content-type'
     }
   });
+  const status = await fetch(`http://127.0.0.1:${address.port}/api/ai/status`, {
+    headers: { origin: 'https://bavel.example' }
+  });
   const native = await fetch(url, {
     method: 'OPTIONS',
     headers: {
@@ -85,6 +89,8 @@ test('allows credentialed CORS only for the configured site and native app origi
 
   assert.equal(web.headers.get('access-control-allow-origin'), 'https://bavel.example');
   assert.equal(web.headers.get('access-control-allow-credentials'), 'true');
+  assert.equal(status.headers.get('access-control-allow-origin'), 'https://bavel.example');
+  assert.deepEqual(await status.json(), { ready: false });
   assert.equal(native.headers.get('access-control-allow-origin'), 'capacitor://localhost');
   assert.equal(untrusted.headers.get('access-control-allow-origin'), null);
 });

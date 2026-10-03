@@ -292,10 +292,7 @@ async function sendWebPushToUser(
     .toLowerCase()
     .trim();
   const db = serverSupabase.getServiceClient();
-  const { data: subs, error } = await db
-    .from('push_subscriptions')
-    .select('endpoint,keys')
-    .eq('user_id', cleanId);
+  const { data: subs, error } = await db.from('push_subscriptions').select('endpoint,keys').eq('user_id', cleanId);
   if (error) throw error;
   const stringPayload = JSON.stringify(payload);
   return dispatchPushSubscriptions(
@@ -323,13 +320,16 @@ async function sendWebPushToUser(
   );
 }
 
-function respondWithPushResult(
-  res: express.Response,
-  result: Awaited<ReturnType<typeof sendWebPushToUser>>
-) {
+function respondWithPushResult(res: express.Response, result: Awaited<ReturnType<typeof sendWebPushToUser>>) {
   if (!result) return res.status(503).json({ success: false, error: "Résultat d'envoi Push indisponible." });
   const statusCode =
-    result.status === 'accepted' ? 200 : result.status === 'partial_failure' ? 207 : result.status === 'no_subscriptions' ? 404 : 502;
+    result.status === 'accepted'
+      ? 200
+      : result.status === 'partial_failure'
+        ? 207
+        : result.status === 'no_subscriptions'
+          ? 404
+          : 502;
   return res.status(statusCode).json({
     success: result.acceptedCount > 0,
     deliveryStatus: result.status,
@@ -540,34 +540,6 @@ async function startServer() {
     await verifyRateLimitStoreConnectivity(rateLimitStore);
     console.log('[RateLimit] Upstash REST connectivity verified.');
   }
-  app.get('/api/ai/status', (_req, res) => {
-    return res.json({
-      ready: false,
-      architecture: 'rules-based-profile-matching',
-      execution: 'generative-ai-disabled',
-      externalProvider: false,
-      capabilities: [],
-      availableCapabilities: ['rules-based-profile-affinity'],
-      imageModeration: {
-        execution: 'server-local',
-        model: 'nsfwjs-mobilenet-v2',
-        state: getImageModelState(),
-        imagesSentToExternalProvider: false
-      },
-      unavailable: [
-        'internal-ai-disabled',
-        'biometric-verification',
-        'face-recognition',
-        'identity-document-verification',
-        'stolen-image-detection',
-        'multi-account-detection',
-        'image-ranking',
-        'general-purpose-language-generation',
-        'general-purpose-translation',
-        'automated-offer-generation'
-      ]
-    });
-  });
   const PORT = Number(process.env.PORT || 3000);
   if (!Number.isInteger(PORT) || PORT < 1 || PORT > 65535) {
     throw new Error('PORT must be a valid TCP port.');
@@ -603,6 +575,34 @@ async function startServer() {
       return res.redirect(308, `https://${canonicalHost}${req.originalUrl}`);
     }
     next();
+  });
+  app.get('/api/ai/status', (_req, res) => {
+    return res.json({
+      ready: false,
+      architecture: 'rules-based-profile-matching',
+      execution: 'generative-ai-disabled',
+      externalProvider: false,
+      capabilities: [],
+      availableCapabilities: ['rules-based-profile-affinity'],
+      imageModeration: {
+        execution: 'server-local',
+        model: 'nsfwjs-mobilenet-v2',
+        state: getImageModelState(),
+        imagesSentToExternalProvider: false
+      },
+      unavailable: [
+        'internal-ai-disabled',
+        'biometric-verification',
+        'face-recognition',
+        'identity-document-verification',
+        'stolen-image-detection',
+        'multi-account-detection',
+        'image-ranking',
+        'general-purpose-language-generation',
+        'general-purpose-translation',
+        'automated-offer-generation'
+      ]
+    });
   });
 
   const imageModerationPaths = [
@@ -1064,16 +1064,11 @@ async function startServer() {
     if (!product) return res.status(400).json({ error: 'Produit de paiement invalide.' });
 
     const mobileMoneyAvailable = Boolean(
-      process.env.MOBILE_MONEY_CHECKOUT_URL &&
-        process.env.MOBILE_MONEY_API_KEY &&
-        process.env.MOBILE_MONEY_MERCHANT_ID
+      process.env.MOBILE_MONEY_CHECKOUT_URL && process.env.MOBILE_MONEY_API_KEY && process.env.MOBILE_MONEY_MERCHANT_ID
     );
     const stripeAvailable = Boolean(process.env.STRIPE_SECRET_KEY);
     const quotes = {
-      card:
-        stripeAvailable && product.eur !== undefined
-          ? { amount: product.eur, currency: 'EUR' }
-          : null,
+      card: stripeAvailable && product.eur !== undefined ? { amount: product.eur, currency: 'EUR' } : null,
       mobile_money:
         mobileMoneyAvailable &&
         mobileMoneySupportsCountry(countryCode) &&
@@ -1100,13 +1095,7 @@ async function startServer() {
 
   app.post('/api/payments/checkout', verifySupabaseToken, requireAuth, async (req, res) => {
     const userId = String((req as any).userId || '');
-    const {
-      method,
-      countryCode,
-      description,
-      productId,
-      productType
-    } = req.body || {};
+    const { method, countryCode, description, productId, productType } = req.body || {};
     if (!['card', 'mobile_money'].includes(method)) {
       return res.status(400).json({ error: 'Paramètres de paiement invalides.' });
     }
@@ -1115,16 +1104,19 @@ async function startServer() {
     const route = resolvePaymentCountry(req, countryCode);
     const isMobileMoney = method === 'mobile_money';
     const mobileMoneyAvailable = Boolean(
-      process.env.MOBILE_MONEY_CHECKOUT_URL &&
-        process.env.MOBILE_MONEY_API_KEY &&
-        process.env.MOBILE_MONEY_MERCHANT_ID
+      process.env.MOBILE_MONEY_CHECKOUT_URL && process.env.MOBILE_MONEY_API_KEY && process.env.MOBILE_MONEY_MERCHANT_ID
     );
     if (
       (isMobileMoney &&
-        (!mobileMoneyAvailable || !mobileMoneySupportsCountry(route) || product.xof === null || product.xof === undefined)) ||
+        (!mobileMoneyAvailable ||
+          !mobileMoneySupportsCountry(route) ||
+          product.xof === null ||
+          product.xof === undefined)) ||
       (!isMobileMoney && !process.env.STRIPE_SECRET_KEY)
     ) {
-      return res.status(503).json({ error: 'Ce moyen de paiement n’est pas disponible pour cette offre et cette zone.' });
+      return res
+        .status(503)
+        .json({ error: 'Ce moyen de paiement n’est pas disponible pour cette offre et cette zone.' });
     }
     const normalizedCurrency = isMobileMoney ? 'XOF' : 'EUR';
     const numericAmount = isMobileMoney ? product.xof! : product.eur;
@@ -3104,17 +3096,16 @@ Retourne un objet JSON strict :
 
     try {
       const db = serverSupabase.getServiceClient();
-      const [{ data: profile, error: profileError }, { data: challenge, error: challengeError }] =
-        await Promise.all([
-          db.from('profiles').select('is_verified').eq('id', userId).maybeSingle(),
-          db
-            .from('profile_photo_verification_challenges')
-            .select('status')
-            .eq('user_id', userId)
-            .order('created_at', { ascending: false })
-            .limit(1)
-            .maybeSingle()
-        ]);
+      const [{ data: profile, error: profileError }, { data: challenge, error: challengeError }] = await Promise.all([
+        db.from('profiles').select('is_verified').eq('id', userId).maybeSingle(),
+        db
+          .from('profile_photo_verification_challenges')
+          .select('status')
+          .eq('user_id', userId)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle()
+      ]);
       if (profileError) throw profileError;
       if (challengeError) throw challengeError;
       if (!profile) return res.status(404).json({ success: false, error: 'Profil introuvable.' });
@@ -3152,8 +3143,7 @@ Retourne un objet JSON strict :
         ...(typeof profile.avatar_url === 'string' ? [profile.avatar_url] : [])
       ].filter(
         (photo): photo is string =>
-          typeof photo === 'string' &&
-          Boolean(getProfilePhotoStoragePath(photo)?.startsWith(`${userId}/`))
+          typeof photo === 'string' && Boolean(getProfilePhotoStoragePath(photo)?.startsWith(`${userId}/`))
       );
       if (profilePhotos.length === 0) {
         return res.status(409).json({
@@ -3180,15 +3170,12 @@ Retourne un objet JSON strict :
       const challengeType = choices[crypto.randomInt(choices.length)];
       const nonce = crypto.randomBytes(32).toString('base64url');
       const expiresAt = new Date(Date.now() + 5 * 60_000).toISOString();
-      const { data: challengeId, error: challengeError } = await db.rpc(
-        'create_profile_photo_verification_challenge',
-        {
-          p_user_id: userId,
-          p_nonce_hash: createVerificationNonceHash(nonce),
-          p_challenge_type: challengeType,
-          p_expires_at: expiresAt
-        }
-      );
+      const { data: challengeId, error: challengeError } = await db.rpc('create_profile_photo_verification_challenge', {
+        p_user_id: userId,
+        p_nonce_hash: createVerificationNonceHash(nonce),
+        p_challenge_type: challengeType,
+        p_expires_at: expiresAt
+      });
       if (challengeError) throw challengeError;
       if (challengeId === null) {
         return res.status(429).json({
@@ -3269,7 +3256,9 @@ Retourne un objet JSON strict :
             .eq('id', challengeId)
             .eq('status', 'pending');
           if (expireError) throw expireError;
-          return res.status(410).json({ success: false, error: 'Le défi a expiré. Démarrez une nouvelle vérification.' });
+          return res
+            .status(410)
+            .json({ success: false, error: 'Le défi a expiré. Démarrez une nouvelle vérification.' });
         }
 
         const { data: claimed, error: claimError } = await db
@@ -3291,10 +3280,10 @@ Retourne un objet JSON strict :
             imageDataUrls
           );
           if (result.approved) {
-            const { data: completed, error: completionError } = await db.rpc(
-              'complete_profile_photo_verification',
-              { p_challenge_id: challengeId, p_user_id: userId }
-            );
+            const { data: completed, error: completionError } = await db.rpc('complete_profile_photo_verification', {
+              p_challenge_id: challengeId,
+              p_user_id: userId
+            });
             if (completionError) throw completionError;
             if (completed === true) {
               return res.json({ success: true, verified: true, status: 'approved' });
@@ -3319,7 +3308,8 @@ Retourne un objet JSON strict :
             success: true,
             verified: false,
             status: 'rejected',
-            message: 'La vérification n’a pas abouti. Réessayez avec une photo de profil nette et un visage bien éclairé.'
+            message:
+              'La vérification n’a pas abouti. Réessayez avec une photo de profil nette et un visage bien éclairé.'
           });
         } catch (error) {
           if (error instanceof ProfilePhotoVerificationError) {
@@ -4210,13 +4200,11 @@ Return a JSON object with:
       }
 
       if (!INTERNAL_AI_ENABLED) {
-        return res
-          .status(503)
-          .json({
-            isSafe: false,
-            blurRequired: true,
-            message: 'Modération photo non configurée : image protégée par précaution.'
-          });
+        return res.status(503).json({
+          isSafe: false,
+          blurRequired: true,
+          message: 'Modération photo non configurée : image protégée par précaution.'
+        });
       }
 
       const prompt = `You are a Trust and Safety AI moderator for a dating app. 
@@ -4233,13 +4221,11 @@ Return a JSON object with:
       if (data) {
         return res.json({ isSafe: data.isSafe !== false, message: data.message || 'Image approuvée.' });
       }
-      return res
-        .status(503)
-        .json({
-          isSafe: false,
-          blurRequired: true,
-          message: 'Modération photo indisponible : image protégée par précaution.'
-        });
+      return res.status(503).json({
+        isSafe: false,
+        blurRequired: true,
+        message: 'Modération photo indisponible : image protégée par précaution.'
+      });
     } catch (error) {
       console.error('NSFW check error:', error);
       return res.status(503).json({
@@ -5143,7 +5129,8 @@ Return a JSON object with:
         }
         if (isVerified) {
           return res.status(503).json({
-            error: 'L’attribution de badge est désactivée tant qu’un fournisseur de vérification réel n’est pas configuré.'
+            error:
+              'L’attribution de badge est désactivée tant qu’un fournisseur de vérification réel n’est pas configuré.'
           });
         }
 
@@ -6559,7 +6546,7 @@ Return a JSON object with:
       return respondWithPushResult(res, result);
     } catch (error) {
       console.error('[WebPush] Échec du test de notification:', error);
-      return res.status(503).json({ success: false, error: "Envoi Push indisponible." });
+      return res.status(503).json({ success: false, error: 'Envoi Push indisponible.' });
     }
   });
 
@@ -6590,7 +6577,7 @@ Return a JSON object with:
       return respondWithPushResult(res, result);
     } catch (err) {
       console.error('[WebPush] Échec du test de notification de relance:', err);
-      return res.status(503).json({ success: false, error: "Envoi Push indisponible." });
+      return res.status(503).json({ success: false, error: 'Envoi Push indisponible.' });
     }
   });
 
@@ -6626,7 +6613,7 @@ Return a JSON object with:
       return respondWithPushResult(res, result);
     } catch (err) {
       console.error('[WebPush] Échec de dispatch de notification:', err);
-      return res.status(503).json({ success: false, error: "Envoi Push indisponible." });
+      return res.status(503).json({ success: false, error: 'Envoi Push indisponible.' });
     }
   });
 
@@ -7679,25 +7666,21 @@ Return a JSON object with:
         .from('support_tickets')
         .update({ status: 'in_progress', updated_at: new Date().toISOString() })
         .eq('id', ticketId);
-      await db
-        .from('admin_actions')
-        .insert({
-          admin_id: String((req as any).userId),
-          target_user_id: ticket.user_id,
-          action_type: 'support_reply',
-          description: `Réponse au ticket ${ticketId}`
-        });
-      return res
-        .status(201)
-        .json({
-          message: {
-            id: message.id,
-            sender: 'support',
-            senderName: 'Support Bavel',
-            text: body,
-            time: new Date(message.created_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
-          }
-        });
+      await db.from('admin_actions').insert({
+        admin_id: String((req as any).userId),
+        target_user_id: ticket.user_id,
+        action_type: 'support_reply',
+        description: `Réponse au ticket ${ticketId}`
+      });
+      return res.status(201).json({
+        message: {
+          id: message.id,
+          sender: 'support',
+          senderName: 'Support Bavel',
+          text: body,
+          time: new Date(message.created_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
+        }
+      });
     } catch (error) {
       console.error('Admin support reply failed:', error);
       return res.status(503).json({ error: 'Réponse support indisponible.' });
