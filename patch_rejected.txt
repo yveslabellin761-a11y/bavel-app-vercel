@@ -1,0 +1,30 @@
+--- src/components/mobile/profils/EditProfileMenu.tsx
++++ src/components/mobile/profils/EditProfileMenu.tsx
+@@ -4519,6 +4519,27 @@
+                   </div>
+                 )}
+ 
++                {/* --- STATE 5: REJECTED --- */}
++                {verificationStep === 'rejected' && (
++                  <div className="flex-1 flex flex-col items-center justify-center space-y-6 my-auto text-center px-6 z-20">
++                    <div className="w-24 h-24 bg-red-500 rounded-full flex items-center justify-center border-4 border-white shadow-lg animate-scale">
++                      <X className="w-12 h-12 text-white" strokeWidth={3} />
++                    </div>
++                    <div className="space-y-2 max-w-xs">
++                      <h4 className="text-[24px] font-black text-red-400 leading-tight">Vérification échouée</h4>
++                      <p className="text-sm text-gray-300">
++                        {verificationFeedbackText}
++                      </p>
++                    </div>
++                    <button 
++                      onClick={startCameraVerification}
++                      className="bg-white text-black font-bold text-base px-8 py-3.5 rounded-full shadow-lg active:scale-95 transition-transform cursor-pointer"
++                    >
++                      Réessayer
++                    </button>
++                  </div>
++                )}
++
+                 {/* Hidden canvas for native photo capture extraction */}
+                 <canvas ref={verificationCanvasRef} className="hidden" />
+               </div>

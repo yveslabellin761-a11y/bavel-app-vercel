@@ -1,0 +1,6 @@
+{
+  "name": "Bavel",
+  "description": "Site premium de rencontre pour célibataires en Côte d'Ivoire. Rencontrez l'amour à Abidjan, Yamoussoukro, Bouaké et plus encore !",
+  "requestFramePermissions": ["geolocation", "camera", "microphone"],
+  "majorCapabilities": ["BAVEL_INTERNAL_AI_MODERATION", "BAVEL_INTERNAL_AI_RECOMMENDATIONS", "BAVEL_INTERNAL_AI_SAFETY"]
+}

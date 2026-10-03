@@ -1,0 +1,303 @@
+@import 'tailwindcss';
+@import 'tw-animate-css';
+
+@layer utilities {
+  .font-zapfino {
+    font-family: 'Zapfino', cursive;
+  }
+
+  .gpu-layer {
+    transform: translateZ(0);
+    backface-visibility: hidden;
+    perspective: 1000px;
+    will-change: transform, opacity;
+  }
+
+  .smooth-gpu {
+    -webkit-backface-visibility: hidden;
+    backface-visibility: hidden;
+    transform: translate3d(0, 0, 0);
+  }
+
+  @keyframes electric-flow {
+    0% {
+      background-position: 200% center;
+    }
+    100% {
+      background-position: 0% center;
+    }
+  }
+
+  .electric-text {
+    background: linear-gradient(90deg, #fb7185 0%, #d8b4fe 35%, #ffffff 50%, #d8b4fe 65%, #fb7185 100%);
+    background-size: 200% auto;
+    color: transparent;
+    -webkit-background-clip: text;
+    background-clip: text;
+    animation: electric-flow 2s linear infinite;
+  }
+}
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+    font-size: 16px;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+    font-synthesis: none;
+    line-height: 1.5;
+  }
+
+  /* Adaptation fluide de la taille des caractères pour petits et très petits écrans mobiles */
+  @media (max-width: 390px) {
+    html {
+      font-size: 15px;
+    }
+  }
+
+  @media (max-width: 350px) {
+    html {
+      font-size: 14px;
+    }
+  }
+
+  @media (max-width: 320px) {
+    html {
+      font-size: 13.5px;
+    }
+  }
+
+  /* Conteneur adapté au mobile */
+  .mobile-scale {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: hidden;
+  }
+
+  html,
+  body {
+    overscroll-behavior-y: none;
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
+    touch-action: pan-x pan-y pinch-zoom;
+    min-height: 100%;
+    font-family:
+      -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Display', 'Segoe UI', Roboto, 'Helvetica Neue', Arial,
+      sans-serif;
+    letter-spacing: -0.01em;
+  }
+
+  #root {
+    min-height: 100vh;
+    min-height: 100dvh;
+  }
+
+  button,
+  a,
+  [role='button'] {
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  :focus-visible {
+    outline: 3px solid rgba(156, 31, 53, 0.72);
+    outline-offset: 3px;
+  }
+
+  .bavel-app-shell {
+    box-sizing: border-box;
+    padding-top: env(safe-area-inset-top);
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+  }
+
+  .bavel-bottom-nav {
+    padding-bottom: calc(0.625rem + env(safe-area-inset-bottom));
+    transition:
+      background-color 180ms ease,
+      border-color 180ms ease;
+  }
+
+  button,
+  a,
+  [role='button'] {
+    transition-property: color, background-color, border-color, box-shadow, opacity;
+    transition-duration: 160ms;
+    transition-timing-function: cubic-bezier(0.2, 0.75, 0.25, 1);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      scroll-behavior: auto !important;
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+
+  /* Gestion fluide des césures et des caractères accentués français sur mobile */
+  p,
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6,
+  span,
+  label,
+  button,
+  a {
+    overflow-wrap: break-word;
+    word-break: normal;
+    hyphens: auto;
+  }
+
+  /* Empêche les sauts de lignes disgracieux sur les badges, onglets et boutons */
+  .badge-text,
+  .pill-text,
+  .tab-label,
+  button span,
+  .whitespace-nowrap {
+    white-space: nowrap;
+    word-break: normal;
+  }
+
+  /* Rendu optimal des champs de saisie sur mobile */
+  input,
+  textarea,
+  select {
+    user-select: auto;
+    font-size: 16px !important; /* Évite le zoom automatique forcé sur iOS Safari */
+    letter-spacing: -0.01em;
+    font-family: inherit;
+  }
+}
+
+/* Utilitaires typographiques adaptés aux petits écrans tactiles */
+.text-mobile-display {
+  font-size: clamp(1.25rem, 5vw, 1.625rem);
+  line-height: 1.25;
+  letter-spacing: -0.025em;
+  font-weight: 700;
+}
+
+.text-mobile-h1 {
+  font-size: clamp(1.125rem, 4.2vw, 1.375rem);
+  line-height: 1.3;
+  letter-spacing: -0.02em;
+  font-weight: 600;
+}
+
+.text-mobile-body {
+  font-size: clamp(0.875rem, 3.5vw, 0.95rem);
+  line-height: 1.45;
+  letter-spacing: -0.01em;
+}
+
+.text-mobile-caption {
+  font-size: clamp(0.72rem, 2.8vw, 0.8125rem);
+  line-height: 1.35;
+  letter-spacing: -0.005em;
+}
+
+.mobile-clamp-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.mobile-clamp-3 {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* Hide scrollbars globally across all elements */
+*::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+
+* {
+  -ms-overflow-style: none !important; /* IE and Edge */
+  scrollbar-width: none !important; /* Firefox */
+}
+
+@utility scrollbar-hide {
+  -ms-overflow-style: none !important;
+  scrollbar-width: none !important;
+  &::-webkit-scrollbar {
+    display: none !important;
+    width: 0 !important;
+    height: 0 !important;
+  }
+}
+
+@keyframes heartbeat {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.3);
+  }
+}
+@keyframes wiggle {
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+  25% {
+    transform: rotate(-10deg);
+  }
+  75% {
+    transform: rotate(10deg);
+  }
+}
+@keyframes float-emoji {
+  0%,
+  100% {
+    transform: translateY(0px) scale(1);
+  }
+  50% {
+    transform: translateY(-6px) scale(1.15);
+  }
+}
+@keyframes rotate-sparkle {
+  0% {
+    transform: rotate(0deg) scale(1);
+  }
+  50% {
+    transform: rotate(180deg) scale(1.25);
+  }
+  100% {
+    transform: rotate(360deg) scale(1);
+  }
+}
+
+@utility animate-heartbeat {
+  display: inline-block;
+  animation: heartbeat 0.8s infinite ease-in-out;
+}
+
+@utility animate-wiggle {
+  display: inline-block;
+  animation: wiggle 0.5s infinite ease-in-out;
+}
+
+@utility animate-float-emoji {
+  display: inline-block;
+  animation: float-emoji 1.4s infinite ease-in-out;
+}
+
+@utility animate-rotate-sparkle {
+  display: inline-block;
+  animation: rotate-sparkle 2s infinite linear;
+}

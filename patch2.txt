@@ -1,0 +1,370 @@
+--- src/components/mobile/SettingsMenu.tsx
++++ src/components/mobile/SettingsMenu.tsx
+@@ -2886,310 +2886,58 @@
+ }
+ 
+ export function ConfidentialityMenu({ 
+   onClose,
+   userProfile,
+   setUserProfile
+ }: { 
+   onClose: () => void;
+   userProfile?: any;
+   setUserProfile?: React.Dispatch<React.SetStateAction<any>>;
+ }) {
+-  const [accessKey, setAccessKey] = useState<boolean>(() => {
+-    try {
+-      const saved = localStorage.getItem('bavel_privacy_access_key');
+-      return saved ? JSON.parse(saved) : false;
+-    } catch (e) { return false; }
+-  });
+-  
+-  const [showLocation, setShowLocation] = useState<boolean>(() => {
+-    try {
+-      const saved = localStorage.getItem('bavel_privacy_show_location');
+-      return saved ? JSON.parse(saved) : true;
+-    } catch (e) { return true; }
+-  });
+-
+-  const [showOnline, setShowOnline] = useState<boolean>(() => {
+-    try {
+-      const saved = localStorage.getItem('bavel_privacy_show_online');
+-      return saved ? JSON.parse(saved) : true;
+-    } catch (e) { return true; }
+-  });
+-
+-  const [limitVisits, setLimitVisits] = useState<boolean>(() => {
+-    try {
+-      const saved = localStorage.getItem('bavel_privacy_limit_visits');
+-      return saved ? JSON.parse(saved) : false;
+-    } catch (e) { return false; }
+-  });
+-
+-  const [ghostMode, setGhostMode] = useState<boolean>(() => {
+-    try {
+-      const saved = localStorage.getItem('bavel_privacy_ghost_mode');
+-      return saved ? JSON.parse(saved) : (userProfile?.ghostMode || false);
+-    } catch (e) { return false; }
+-  });
+-
+-  const [privateDetectorBlur, setPrivateDetectorBlur] = useState<boolean>(() => {
+-    try {
+-      const saved = localStorage.getItem('bavel_privacy_private_detector');
+-      return saved ? JSON.parse(saved) : true;
+-    } catch (e) { return true; }
+-  });
+-
+-  const [readReceipts, setReadReceipts] = useState<boolean>(() => {
+-    try {
+-      const saved = localStorage.getItem('bavel_privacy_read_receipts');
+-      return saved ? JSON.parse(saved) : true;
+-    } catch (e) { return true; }
+-  });
+-
+-  const [searchEngineIndexing, setSearchEngineIndexing] = useState<boolean>(() => {
+-    try {
+-      const saved = localStorage.getItem('bavel_privacy_search_indexing');
+-      return saved ? JSON.parse(saved) : false;
+-    } catch (e) { return false; }
+-  });
+-
+-  const [showAds, setShowAds] = useState<boolean>(() => {
+-    try {
+-      const saved = localStorage.getItem('bavel_privacy_show_ads');
+-      return saved ? JSON.parse(saved) : true;
+-    } catch (e) { return true; }
+-  });
+-
+-  const [toastMsg, setToastMsg] = useState<string | null>(null);
+-
+-  // Sub-modals
+-  const [showPasskeyModal, setShowPasskeyModal] = useState(false);
+-  const [passkeyStep, setPasskeyStep] = useState<'idle' | 'registering' | 'success'>('idle');
+-  const [showAdPreferencesModal, setShowAdPreferencesModal] = useState(false);
+-  const [showLocationBlockedTutorial, setShowLocationBlockedTutorial] = useState(false);
+-  const [showSystemLocationModal, setShowSystemLocationModal] = useState(false);
+-  const [targetedAds, setTargetedAds] = useState(true);
+-  const [analyticsCookies, setAnalyticsCookies] = useState(true);
+-  const [showPrivacyPolicyModal, setShowPrivacyPolicyModal] = useState(false);
+-  const [showCookiePolicyModal, setShowCookiePolicyModal] = useState(false);
+-
+-  const triggerToast = (msg: string) => {
+-    setToastMsg(msg);
+-    setTimeout(() => setToastMsg(null), 3200);
+-  };
+-
+-  const handleToggleAccessKey = () => {
+-    if (!accessKey) {
+-      setShowPasskeyModal(true);
+-      setPasskeyStep('idle');
+-    } else {
+-      setAccessKey(false);
+-      localStorage.setItem('bavel_privacy_access_key', 'false');
+-      triggerToast("Clé d'accès désactivée. Connexion par mot de passe/SMS rétablie.");
+-    }
+-  };
+-
+-  const handleRegisterPasskey = () => {
+-    setPasskeyStep('registering');
+-    setTimeout(() => {
+-      setPasskeyStep('success');
+-      setAccessKey(true);
+-      localStorage.setItem('bavel_privacy_access_key', 'true');
+-      triggerToast("Clé d'accès biométrique activée avec succès !");
+-    }, 1400);
+-  };
+-
+-  const handleToggleLocation = async () => {
+-    const nextVal = !showLocation;
+-    setShowLocation(nextVal);
+-    localStorage.setItem('bavel_privacy_show_location', JSON.stringify(nextVal));
+-    setUserProfile?.((prev: any) => ({ ...prev, showLocation: nextVal }));
+-    
+-    if (nextVal) {
+-      const result = await requestLocationPermissionWithFlow();
+-      if (result.denied) {
+-        setShowLocationBlockedTutorial(true);
+-      } else if (result.success) {
+-        triggerToast("📍 Localisation activée et visible sur votre profil");
+-      } else {
+-        triggerToast("Localisation activée");
+-      }
+-    } else {
+-      triggerToast("Localisation masquée du profil");
+-    }
+-  };
+-
+-  const handleToggleOnline = () => {
+-    const nextVal = !showOnline;
+-    setShowOnline(nextVal);
+-    localStorage.setItem('bavel_privacy_show_online', JSON.stringify(nextVal));
+-    setUserProfile?.((prev: any) => ({ ...prev, showOnline: nextVal }));
+-    triggerToast(nextVal ? "Statut En Ligne activé" : "Statut En Ligne masqué");
+-  };
+-
+-  const handleToggleLimitVisits = () => {
+-    const nextVal = !limitVisits;
+-    setLimitVisits(nextVal);
+-    localStorage.setItem('bavel_privacy_limit_visits', JSON.stringify(nextVal));
+-    triggerToast(nextVal ? "Mode Discret activé : seuls vos likes vous voient" : "Visites de profil normales rétablies");
+-  };
+-
+-  const handleToggleGhostMode = () => {
+-    const nextVal = !ghostMode;
+-    setGhostMode(nextVal);
+-    localStorage.setItem('bavel_privacy_ghost_mode', JSON.stringify(nextVal));
+-    setUserProfile?.((prev: any) => {
+-      const updated = { ...prev, ghostMode: nextVal };
+-      syncProfileToSupabase(updated);
+-      return updated;
+-    });
+-    triggerToast(
+-      nextVal 
+-        ? "👻 Mode Fantôme activé : Profil masqué des recherches (discussions toujours actives)" 
+-        : "Mode Fantôme désactivé : Votre profil réapparaît dans les recherches"
+-    );
+-  };
+-
+-  const handleTogglePrivateDetector = () => {
+-    const nextVal = !privateDetectorBlur;
+-    setPrivateDetectorBlur(nextVal);
+-    localStorage.setItem('bavel_privacy_private_detector', JSON.stringify(nextVal));
+-    triggerToast(nextVal ? "Floutage automatique Private Detector™ activé" : "Floutage automatique désactivé");
+-  };
+-
+-  const handleToggleReadReceipts = () => {
+-    const nextVal = !readReceipts;
+-    setReadReceipts(nextVal);
+-    localStorage.setItem('bavel_privacy_read_receipts', JSON.stringify(nextVal));
+-    triggerToast(nextVal ? "Accusés de lecture activés (vu ✓✓)" : "Accusés de lecture masqués");
+-  };
+-
+-  const handleToggleSearchIndexing = () => {
+-    const nextVal = !searchEngineIndexing;
+-    setSearchEngineIndexing(nextVal);
+-    localStorage.setItem('bavel_privacy_search_indexing', JSON.stringify(nextVal));
+-    triggerToast(nextVal ? "Profil masqué des partages et moteurs externes" : "Profil indexable normalement");
+-  };
+-
+-  const handleToggleAds = () => {
+-    const nextVal = !showAds;
+-    setShowAds(nextVal);
+-    localStorage.setItem('bavel_privacy_show_ads', JSON.stringify(nextVal));
+-    triggerToast(nextVal ? "Publicités activées" : "Publicités désactivées");
+-  };
+-
+-  const handleExportData = () => {
+-    const exportObject = {
+-      user: userProfile || { name: 'Steven', city: 'Abidjan', email: 'donkoff90@gmail.com' },
+-      privacySettings: {
+-        accessKey,
+-        showLocation,
+-        showOnline,
+-        limitVisits,
+-        ghostMode,
+-        privateDetectorBlur,
+-        readReceipts,
+-        searchEngineIndexing,
+-        targetedAds,
+-        analyticsCookies
+-      },
+-      exportDate: new Date().toISOString(),
+-      app: "Bavel Côte d'Ivoire - Exportation Données RGPD"
+-    };
+-    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(exportObject, null, 2));
+-    const downloadAnchor = document.createElement('a');
+-    downloadAnchor.setAttribute("href", dataStr);
+-    downloadAnchor.setAttribute("download", `bavel_rgpd_data_${Date.now()}.json`);
+-    document.body.appendChild(downloadAnchor);
+-    downloadAnchor.click();
+-    downloadAnchor.remove();
+-    triggerToast("📥 Vos données RGPD ont été téléchargées en fichier JSON !");
+-  };
+-
+-  return (
+-    <div className="fixed inset-0 bg-[#f2f2f7] z-[120] flex flex-col h-[100dvh] overflow-hidden select-none font-sans">
+-      {/* Header */}
+-      <div className="flex items-center justify-between pt-10 pb-3 px-4 bg-white border-b border-gray-200/80 shrink-0 relative">
+-        <button 
+-          onClick={onClose} 
+-          className="p-1 -ml-1 text-black hover:opacity-70 transition-opacity cursor-pointer z-10"
+-          aria-label="Retour"
+-        >
+-          <ChevronLeft className="w-6 h-6 text-black" strokeWidth={2.2} />
+-        </button>
+-        <h2 className="text-[17px] font-bold text-black tracking-tight absolute left-1/2 -translate-x-1/2">
+-          Confidentialité
+-        </h2>
+-        <div className="w-6" />
+-      </div>
+-
+-      {/* Main Content Area (IMG_4412.PNG) */}
+-      <div className="flex-1 overflow-y-auto bg-[#f2f2f7] pb-12 scrollbar-hide">
+-        
+-        {/* Item 1: Activer la clé d'accès */}
+-        <div className="mt-4 border-t border-b border-gray-200/70 bg-white">
+-          <div className="px-4 py-3.5 flex items-center justify-between">
+-            <span className="text-[15px] font-medium text-black tracking-tight">
+-              Activer la clé d'accès
+-            </span>
+-            <button 
+-              type="button"
+-              onClick={handleToggleAccessKey}
+-              className={`w-[51px] h-[31px] rounded-full transition-colors relative duration-200 focus:outline-none shrink-0 cursor-pointer ${
+-                accessKey ? 'bg-[#30d158]' : 'bg-[#e9e9eb]'
+-              }`}
+-            >
+-              <div 
+-                className={`w-[27px] h-[27px] rounded-full bg-white absolute top-[2px] transition-transform duration-200 shadow-sm ${
+-                  accessKey ? 'translate-x-[22px]' : 'translate-x-[2px]'
+-                }`}
+-              />
+-            </button>
+-          </div>
+-        </div>
+-        <div className="px-4 py-2.5">
+-          <p className="text-[13px] text-gray-500 font-normal leading-snug">
+-            Vous pourrez vous connecter en utilisant votre clé d'accès, et non par votre mot de passe ou par la vérification SMS.
+-          </p>
+-        </div>
+-
+-        {/* Item 2: Afficher mon emplacement */}
+-        <div className="mt-2 border-t border-b border-gray-200/70 bg-white">
+-          <div className="px-4 py-3.5 flex items-center justify-between">
+-            <div 
+-              onClick={() => setShowSystemLocationModal(true)}
+-              className="flex items-center space-x-2 cursor-pointer group"
+-            >
+-              <span className="text-[15px] font-medium text-black tracking-tight group-hover:text-[#9c1f35] transition-colors">
+-                Afficher mon emplacement
+-              </span>
+-              <span className="text-[11px] text-[#9c1f35] bg-rose-50 px-2 py-0.5 rounded-full font-semibold border border-rose-200">
+-                GPS &amp; Réglages
+-              </span>
+-            </div>
+-            <button 
+-              type="button"
+-              onClick={handleToggleLocation}
+-              className={`w-[51px] h-[31px] rounded-full transition-colors relative duration-200 focus:outline-none shrink-0 cursor-pointer ${
+-                showLocation ? 'bg-[#30d158]' : 'bg-[#e9e9eb]'
+-              }`}
+-            >
+-              <div 
+-                className={`w-[27px] h-[27px] rounded-full bg-white absolute top-[2px] transition-transform duration-200 shadow-sm ${
+-                  showLocation ? 'translate-x-[22px]' : 'translate-x-[2px]'
+-                }`}
+-              />
+-            </button>
+-          </div>
+-        </div>
+-        <div className="px-4 py-2.5">
+-          <p className="text-[13px] text-gray-500 font-normal leading-snug">
+-            Activez la géolocalisation pour voir les profils à proximité. Pas d'inquiétude : nous ne partagerons jamais votre emplacement exact. Vous recevrez moins de messages si vous désactivez cette option.
+-          </p>
+-        </div>
+-
+-        {/* Item 3: Me montrer en ligne */}
+-        <div className="mt-2 border-t border-b border-gray-200/70 bg-white">
+-          <div className="px-4 py-3.5 flex items-center justify-between">
+-            <span className="text-[15px] font-medium text-black tracking-tight">
+-              Me montrer en ligne
+-            </span>
+-            <button 
+-              type="button"
+-              onClick={handleToggleOnline}
+-              className={`w-[51px] h-[31px] rounded-full transition-colors relative duration-200 focus:outline-none shrink-0 cursor-pointer ${
+-                showOnline ? 'bg-[#30d158]' : 'bg-[#e9e9eb]'
+-              }`}
+-            >
++  return (
++    <div className="fixed inset-0 z-[120] flex items-end justify-center sm:items-center bg-black/40 backdrop-blur-sm p-0 sm:p-4 font-sans">
++      <motion.div 
++        initial={{ y: "100%" }}
++        animate={{ y: 0 }}
++        exit={{ y: "100%" }}
++        transition={{ type: "spring", damping: 25, stiffness: 300 }}
++        className="bg-white w-full max-w-md rounded-t-[24px] sm:rounded-[24px] shadow-2xl relative overflow-hidden flex flex-col"
++      >
++        <button 
++          onClick={onClose} 
++          className="absolute top-4 right-4 p-2 text-black hover:bg-gray-100 rounded-full transition-colors z-10"
++        >
++          <X className="w-6 h-6" strokeWidth={2.5} />
++        </button>
++
++        <div className="p-6 flex flex-col items-center text-center mt-2">
++          {/* Lock Icon */}
++          <div className="w-[52px] h-[52px] bg-[#f4e6ff] rounded-full flex items-center justify-center mb-6">
++            <Lock className="w-6 h-6 text-black" strokeWidth={2.5} />
++          </div>
++
++          <h2 className="text-[22px] font-bold text-black tracking-tight mb-3">
++            Gérer votre confidentialité
++          </h2>
++          
++          <p className="text-[15px] text-gray-500 leading-relaxed max-w-[280px] mb-8">
++            Partagez ou cachez vos infos, comme votre emplacement ou votre profil. Vous pouvez modifier ces paramètres à tout moment.
++          </p>
++
++          <button 
++            onClick={() => {
++              // Add navigation to privacy settings page if needed
++              alert("Ouvrir les paramètres de confidentialité");
++              onClose();
++            }}
++            className="w-full bg-[#111111] hover:bg-black text-white font-bold py-4 rounded-full text-[16px] transition-all mb-4 active:scale-[0.98]"
++          >
++            Modifier paramètres
++          </button>
++          
++          <button 
++            onClick={onClose}
++            className="w-full bg-white hover:bg-gray-50 text-black font-bold py-4 rounded-full text-[16px] transition-all active:scale-[0.98]"
++          >
++            Plus tard
++          </button>
++        </div>
++      </motion.div>
++    </div>
++  );
++}

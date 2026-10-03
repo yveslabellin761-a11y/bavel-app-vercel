@@ -1,0 +1,44 @@
+{
+  "name": "Bavel - Rencontres 🇨🇮",
+  "short_name": "Bavel",
+  "description": "L'application mobile N°1 de rencontre pour les célibataires en Côte d'Ivoire. Trouvez l'amour à Abidjan et partout en Côte d'Ivoire.",
+  "start_url": "/",
+  "id": "/",
+  "scope": "/",
+  "display": "standalone",
+  "display_override": ["standalone", "minimal-ui"],
+  "orientation": "portrait",
+  "background_color": "#ffffff",
+  "theme_color": "#9c1f35",
+  "categories": ["social", "dating", "lifestyle"],
+  "icons": [
+    {
+      "src": "/pwa-icon.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/pwa-icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Messages & Chats",
+      "short_name": "Messages",
+      "description": "Accédez directement à vos conversations",
+      "url": "/?tab=discussions",
+      "icons": [{ "src": "/pwa-icon.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Découvrir des Profils",
+      "short_name": "Découvrir",
+      "description": "Parcourez les nouveaux célibataires",
+      "url": "/?tab=discover",
+      "icons": [{ "src": "/pwa-icon.png", "sizes": "192x192" }]
+    }
+  ]
+}

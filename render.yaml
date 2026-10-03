@@ -1,0 +1,48 @@
+services:
+  - type: web
+    name: bavel-api
+    runtime: node
+    plan: starter
+    buildCommand: npm ci --include=dev && npm run build
+    startCommand: npm start
+    healthCheckPath: /health
+    autoDeploy: false
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_ANON_KEY
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: FRONTEND_URL
+        sync: false
+      - key: UPSTASH_REDIS_REST_URL
+        sync: false
+      - key: UPSTASH_REDIS_REST_TOKEN
+        sync: false
+      - key: SENTRY_DSN
+        sync: false
+      - key: VAPID_PUBLIC_KEY
+        sync: false
+      - key: VAPID_PRIVATE_KEY
+        sync: false
+      - key: VAPID_EMAIL
+        sync: false
+      - key: STRIPE_SECRET_KEY
+        sync: false
+      - key: STRIPE_WEBHOOK_SECRET
+        sync: false
+      - key: MOBILE_MONEY_CHECKOUT_URL
+        sync: false
+      - key: MOBILE_MONEY_API_KEY
+        sync: false
+      - key: MOBILE_MONEY_MERCHANT_ID
+        sync: false
+      - key: MOBILE_MONEY_WEBHOOK_SECRET
+        sync: false
+      - key: MOBILE_MONEY_COUNTRIES
+        sync: false

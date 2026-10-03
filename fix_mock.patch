@@ -1,0 +1,43 @@
+--- src/data/mockData.ts
++++ src/data/mockData.ts
+@@ -2,6 +2,8 @@
+ import ManCoveringFace from '../assets/images/man_covering_face_1784885151434.jpg';
+ import ShirtlessMan from '../assets/images/shirtless_man_1784885117678.jpg';
+ import SurferMan from '../assets/images/surfer_man_1784885103664.jpg';
++import WomanBraids from '../assets/images/african_woman_braids_1785580061464.jpg';
++import WomanHijab from '../assets/images/african_woman_hijab_1785580083270.jpg';
+ 
+ export const MOCK_PROFILES = [
+   {
+@@ -62,5 +64,31 @@
+     distance: "15 km",
+     details: ["Grand(e)", "Actif(ve)", "Athée", "Ne boit pas", "Ne fume pas"],
+     language: "Anglais",
++  },
++  {
++    id: 5,
++    name: "Aminata",
++    age: 26,
++    img: WomanBraids,
++    location: "Abidjan, Cocody",
++    relation: "Une histoire sérieuse",
++    status: "Célibataire",
++    orientation: "Hétéro",
++    distance: "4 km",
++    details: ["Créative", "Sportive", "Non fumeuse", "Aime voyager"],
++    language: "Français, Anglais",
++  },
++  {
++    id: 6,
++    name: "Fatou",
++    age: 24,
++    img: WomanHijab,
++    location: "Dakar",
++    relation: "Amitié ou plus",
++    status: "Célibataire",
++    orientation: "Hétéro",
++    distance: "12 km",
++    details: ["Calme", "Lecture", "Musulmane", "Cuisine"],
++    language: "Français, Wolof",
+   }
+ ];

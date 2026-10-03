@@ -1,0 +1,25 @@
+--- src/components/mobile/profils/EditProfileMenu.tsx
++++ src/components/mobile/profils/EditProfileMenu.tsx
+@@ -966,6 +966,22 @@
+     }
+   };
+ 
++  // Simulated real-time AI guidance during 'pose' step
++  useEffect(() => {
++    if (verificationStep === 'pose') {
++      const messages = [
++        "Recherche de visage...",
++        "Placez votre visage dans le cadre",
++        "Tournez légèrement la tête",
++        "Gardez cette position",
++        "Pose reconnue, vous pouvez capturer"
++      ];
++      let i = 0;
++      const interval = setInterval(() => { setVerificationFeedbackText(messages[(i++) % messages.length]); }, 2500);
++      return () => clearInterval(interval);
++    }
++  }, [verificationStep]);
++
+   const stopVerificationCamera = () => {
+     if (verificationStream) {
+       verificationStream.getTracks().forEach(t => t.stop());

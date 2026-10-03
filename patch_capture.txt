@@ -1,0 +1,102 @@
+--- src/components/mobile/profils/EditProfileMenu.tsx
++++ src/components/mobile/profils/EditProfileMenu.tsx
+@@ -1002,48 +1002,63 @@
+     setVerificationFlash(prev => prev === 'auto' ? 'on' : prev === 'on' ? 'off' : 'auto');
+   };
+ 
+-  const capturePhotoSimulation = () => {
++  const capturePhotoSimulation = async () => {
+     triggerHaptic();
+     setVerificationStep('capturing');
+ 
++    let dataUrl = '';
+     // Capture frame on canvas if video stream is active
+     if (verificationVideoRef.current && verificationCanvasRef.current) {
+       try {
+         const video = verificationVideoRef.current;
+         const canvas = verificationCanvasRef.current;
+         const w = video.videoWidth || 720;
+         const h = video.videoHeight || 1280;
+         canvas.width = w;
+         canvas.height = h;
+         const ctx = canvas.getContext('2d');
+         if (ctx) {
+           // If front camera, mirror the captured image appropriately
+           if (verificationFacing === 'user') {
+             ctx.translate(w, 0);
+             ctx.scale(-1, 1);
+           }
+           ctx.drawImage(video, 0, 0, w, h);
+-          const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
++          dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+           setCapturedSelfieUrl(dataUrl);
+         }
+       } catch (err) {
+         console.warn('Canvas frame capture fallback:', err);
+       }
+     }
+ 
+-    setTimeout(() => {
++    setTimeout(async () => {
+       stopVerificationCamera();
+       setVerificationStep('analyzing');
+       setVerificationProgress(0);
+       
+       let p = 0;
+       const interval = setInterval(() => {
+         p += 5;
+-        if (p >= 100) {
+-          p = 100;
+-          clearInterval(interval);
+-          setTimeout(() => {
+-            setVerificationStep('success');
+-            setUserProfile((prev: any) => {
+-              const updated = {
+-                ...prev,
+-                isVerified: true
+-              };
+-              syncProfileToSupabase(updated, userPhotos);
+-              return updated;
+-            });
+-          }, 400);
+-        }
+-        setVerificationProgress(p);
+-      }, 150);
+-    }, 450);
++        if (p >= 90) p = 90; // Hold at 90% until API responds
++        setVerificationProgress(p);
++      }, 100);
++
++      try {
++        const response = await fetch('/api/ai/verify-pose', {
++          method: 'POST',
++          headers: { 'Content-Type': 'application/json' },
++          body: JSON.stringify({ imageBase64: dataUrl, targetPose: 'Main sur la joue' })
++        });
++        const data = await response.json();
++        
++        clearInterval(interval);
++        setVerificationProgress(100);
++
++        setTimeout(() => {
++          if (data.success) {
++            setVerificationStep('success');
++            setUserProfile((prev: any) => {
++              const updated = { ...prev, isVerified: true };
++              syncProfileToSupabase(updated, userPhotos);
++              return updated;
++            });
++          } else {
++            setVerificationStep('rejected');
++            setVerificationFeedbackText(data.reason || "Votre pose ne correspond pas à l'image demandée.");
++          }
++        }, 500);
++      } catch (err) {
++        clearInterval(interval);
++        setVerificationStep('rejected');
++        setVerificationFeedbackText("Erreur de connexion avec l'IA. Veuillez réessayer.");
++      }
++    }, 400);
+   };
+ 
+   // Phone verification SMS simulator

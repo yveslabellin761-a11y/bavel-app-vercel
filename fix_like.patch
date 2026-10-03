@@ -1,0 +1,18 @@
+--- src/components/mobile/swipes/EncountersProfiles.tsx
++++ src/components/mobile/swipes/EncountersProfiles.tsx
+@@ -511,9 +511,9 @@
+   };
+ 
+-  const handleLikeClick = () => {
++  const handleLikeClick = (force = false) => {
+     if (isPageTurning || exitDirection !== null) return;
+-    if (!isPremium && likesCount <= 0) {
++    if (!isPremium && likesCount <= 0 && !force) {
+       setNoLikesFlowStep('out_of_likes');
+       return;
+     }
+@@ -971,3 +971,3 @@
+                       setTimeout(() => {
+-                        handleLikeClick();
++                        handleLikeClick(true);
+                       }, 100);

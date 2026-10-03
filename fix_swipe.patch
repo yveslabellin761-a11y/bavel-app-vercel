@@ -1,0 +1,110 @@
+--- src/components/mobile/swipes/EncountersProfiles.tsx
++++ src/components/mobile/swipes/EncountersProfiles.tsx
+@@ -321,24 +321,11 @@
+ 
+-  // Swipe Direction State
+-  const [swipeDirection, setSwipeDirection] = useState<'left' | 'right' | 'up' | null>('right');
+-
+-  const triggerLikeCard = () => {
+-    if (isPageTurning) return;
+-    if (!isPremium && likesCount <= 0) {
+-      setNoLikesFlowStep('out_of_likes');
+-      return;
+-    }
+-    setSwipeDirection('right');
+-    setTimeout(() => {
+-      handleLikeDirect(false);
+-      if (!isPremium) {
+-        setLikesCount(prev => Math.max(0, prev - 1));
+-      }
+-    }, 200);
+-  };
+-
+-  const triggerPassCard = () => {
+-    if (isPageTurning) return;
+-    setSwipeDirection('left');
+-    setTimeout(() => handleNext(true), 200);
+-  };
++  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
++  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
++  const [isDragging, setIsDragging] = useState(false);
++  const [exitDirection, setExitDirection] = useState<'left' | 'right' | null>(null);
+ 
+@@ -514,2 +501,77 @@
+ 
++  const handleLikeClick = () => {
++    if (isPageTurning || exitDirection !== null) return;
++    if (!isPremium && likesCount <= 0) {
++      setNoLikesFlowStep('out_of_likes');
++      return;
++    }
++    setExitDirection('right');
++    setTimeout(() => {
++      handleLikeDirect(false);
++      if (!isPremium) {
++        setLikesCount(prev => Math.max(0, prev - 1));
++      }
++      setExitDirection(null);
++      setDragOffset({ x: 0, y: 0 });
++    }, 380);
++  };
++
++  const handlePassClick = () => {
++    if (isPageTurning || exitDirection !== null) return;
++    setExitDirection('left');
++    setTimeout(() => {
++      handleNext(true);
++      setExitDirection(null);
++      setDragOffset({ x: 0, y: 0 });
++    }, 380);
++  };
++
++  const handleStartDrag = (clientX: number, clientY: number) => {
++    if (isPageTurning || exitDirection !== null) return;
++    setIsDragging(true);
++    setDragStart({ x: clientX, y: clientY });
++  };
++
++  const handleMoveDrag = (clientX: number, clientY: number) => {
++    if (isPageTurning || exitDirection !== null || !isDragging) return;
++    setDragOffset({
++      x: clientX - dragStart.x,
++      y: clientY - dragStart.y
++    });
++  };
++
++  const handleEndDrag = () => {
++    if (isPageTurning || exitDirection !== null || !isDragging) return;
++    setIsDragging(false);
++    
++    if (dragOffset.x > 80) {
++      // Swipe right -> like
++      if (!isPremium && likesCount <= 0) {
++        setNoLikesFlowStep('out_of_likes');
++        setDragOffset({ x: 0, y: 0 });
++        return;
++      }
++      setExitDirection('right');
++      setTimeout(() => {
++        handleLikeDirect(false);
++        if (!isPremium) {
++          setLikesCount(prev => Math.max(0, prev - 1));
++        }
++        setExitDirection(null);
++        setDragOffset({ x: 0, y: 0 });
++      }, 380);
++    } else if (dragOffset.x < -80) {
++      // Swipe left -> pass
++      setExitDirection('left');
++      setTimeout(() => {
++        handleNext(true);
++        setExitDirection(null);
++        setDragOffset({ x: 0, y: 0 });
++      }, 380);
++    } else {
++      // Snap back if didn't swipe far enough
++      setDragOffset({ x: 0, y: 0 });
++    }
++  };
++
+   const handleCloseMatch = () => {

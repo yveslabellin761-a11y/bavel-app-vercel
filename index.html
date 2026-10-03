@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>Bavel - Rencontres internationales</title>
+    
+    <!-- PWA Manifest & Theme -->
+    <link rel="manifest" href="/manifest.json" />
+    <meta name="theme-color" content="#9c1f35" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Bavel" />
+    
+    <!-- PWA Icons -->
+    <link rel="icon" type="image/png" href="/pwa-icon.png" />
+    <link rel="apple-touch-icon" href="/pwa-icon.png" />
+    
+    <meta name="description" content="Bavel est une plateforme internationale de rencontres pour créer des connexions authentiques partout dans le monde." />
+    <!-- Open Graph for sharing -->
+    <meta property="og:title" content="Bavel - Rencontres internationales" />
+    <meta property="og:description" content="Créez des connexions authentiques avec des célibataires du monde entier." />
+    <meta property="og:image" content="/pwa-icon.png" />
+
+  </head>
+  <body class="bg-neutral-950 text-neutral-900 select-none antialiased">
+    <div id="root"></div>
+    <script>
+      if (window.location.pathname === '/auth/callback') {
+        const callbackParams = new URLSearchParams(
+          `${window.location.search.replace(/^\?/, '')}&${window.location.hash.replace(/^#/, '')}`
+        );
+        const callbackState = { error: callbackParams.get('error') || callbackParams.get('error_code') };
+        window.__bavelOAuthCallback = callbackState;
+        try {
+          window.sessionStorage.setItem('bavel_oauth_callback', JSON.stringify(callbackState));
+        } catch {
+          // The in-memory state is sufficient when browser storage is unavailable.
+        }
+      }
+    </script>
+    <script type="module" src="/src/main.tsx"></script>
+
+  </body>
+</html>

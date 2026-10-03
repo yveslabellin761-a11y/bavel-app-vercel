@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#9c1f35" />
+    <title>Bavel — hors ligne</title>
+    <style>
+      * { box-sizing: border-box; }
+      body {
+        min-height: 100vh;
+        min-height: 100dvh;
+        margin: 0;
+        padding: max(24px, env(safe-area-inset-top)) 24px max(24px, env(safe-area-inset-bottom));
+        display: grid;
+        place-items: center;
+        color: #1e293b;
+        background: radial-gradient(circle at 50% 0%, #fff1f2, #fff 58%);
+        font: 16px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        text-align: center;
+      }
+      main { width: min(100%, 360px); }
+      .heart {
+        width: 64px;
+        height: 64px;
+        margin: 0 auto 24px;
+        display: grid;
+        place-items: center;
+        border-radius: 22px;
+        color: white;
+        background: linear-gradient(145deg, #9c1f35, #e11d48);
+        box-shadow: 0 12px 30px #9c1f3538;
+        font-size: 28px;
+      }
+      h1 { margin: 0 0 8px; font-size: 24px; letter-spacing: -0.04em; }
+      p { margin: 0 0 24px; color: #64748b; }
+      button {
+        min-height: 48px;
+        padding: 0 22px;
+        border: 0;
+        border-radius: 16px;
+        color: white;
+        background: #9c1f35;
+        font: inherit;
+        font-weight: 700;
+      }
+      button:focus-visible { outline: 3px solid #fb7185; outline-offset: 3px; }
+      @media (prefers-reduced-motion: no-preference) {
+        .heart { animation: float 3s ease-in-out infinite; }
+        @keyframes float { 50% { transform: translateY(-4px); } }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <div class="heart" aria-hidden="true">♡</div>
+      <h1>Une petite pause réseau</h1>
+      <p>Bavel a besoin d’une connexion pour charger vos conversations et vos profils. Vérifiez votre réseau puis réessayez.</p>
+      <button type="button" onclick="location.reload()">Réessayer</button>
+    </main>
+  </body>
+</html>

@@ -1,0 +1,128 @@
+--- src/components/mobile/profils/EditProfileMenu.tsx
++++ src/components/mobile/profils/EditProfileMenu.tsx
+@@ -4259,42 +4259,38 @@
+                 </AnimatePresence>
+ 
+                 {/* Top Close Button for Idle State */}
+                 {verificationStep === 'idle' && (
+-                  <div className="absolute top-0 inset-x-0 h-14 flex items-center px-2 z-50 bg-white">
+-                    <button 
+-                      onClick={() => setActiveSubEditor('none')} 
+-                      className="p-3 text-black hover:bg-gray-100 rounded-full transition-colors active:scale-95"
+-                    >
+-                      <ChevronLeft className="w-6 h-6" strokeWidth={2.5} />
+-                    </button>
+-                    <h1 className="flex-1 text-center text-[17px] font-bold text-black pr-12">Safety Centre</h1>
++                  <div className="absolute top-0 inset-x-0 h-[56px] flex items-center justify-between px-4 z-50 bg-white border-b border-gray-100">
++                    <button 
++                      onClick={() => setActiveSubEditor('none')} 
++                      className="text-black hover:opacity-70 transition-opacity active:scale-95"
++                    >
++                      <ChevronLeft className="w-6 h-6" strokeWidth={2.5} />
++                    </button>
++                    <h1 className="text-[17px] font-bold text-black absolute left-1/2 -translate-x-1/2">Safety Centre</h1>
++                    <div className="w-6" />
+                   </div>
+                 )}
+ 
+                 {/* --- STATE 1: IDLE / PREPARATION --- */}
+                 {verificationStep === 'idle' && (
+-                  <div className="flex-1 flex flex-col justify-between overflow-y-auto pt-20 pb-8 z-10 scrollbar-hide bg-white border-t border-gray-100 mt-14">
++                  <div className="flex-1 overflow-y-auto pt-8 pb-12 z-10 scrollbar-hide bg-white mt-[56px]">
+                     <div className="flex flex-col items-center px-5 w-full max-w-md mx-auto">
+                       {/* Portrait Image with Rounded Corners & Blue Checkmark Badge */}
+-                      <div className="relative mt-2 shrink-0">
++                      <div className="relative shrink-0">
+                         {/* Decorative dashed outline matching the screenshot */}
+-                        <div className="absolute -top-3 -left-3 w-full h-full border-[1.5px] border-dashed border-gray-300 rounded-[20px] pointer-events-none" />
++                        <div className="absolute -top-4 -left-4 w-[160px] h-[200px] border border-dashed border-gray-300 rounded-[16px] pointer-events-none" />
+                         
+-                        <div className="relative w-[180px] h-[240px] rounded-[20px] overflow-hidden bg-gray-100 z-10">
++                        <div className="relative w-[160px] h-[200px] rounded-[16px] overflow-hidden bg-[#5a3da4] z-10 shadow-sm">
+                           <img 
+                             src={poseImg} 
+                             className="w-full h-full object-cover" 
+                             alt="Pose de vérification" 
+                             referrerPolicy="no-referrer"
+                           />
+                         </div>
+                       </div>
+ 
+                       {/* Heading */}
+-                      <h3 className="text-[22px] font-bold text-black text-center mt-8 tracking-tight">
++                      <h3 className="text-[22px] font-bold text-black text-center mt-6 tracking-tight">
+                         Prenez cette pose et faites un selfie
+                       </h3>
+ 
+                       {/* Description Paragraph */}
+-                      <p className="text-[15px] text-gray-500 text-center leading-[1.4] mt-3 px-1">
++                      <p className="text-[15px] text-gray-500 text-center leading-snug mt-3 px-2">
+                         Nous nous assurerons que cette photo correspond bien à la photo publiée sur votre profil. Elle ne sera pas visible par d'autres membres.
+                       </p>
+ 
+                       {/* Requirements List Block */}
+-                      <div className="w-full mt-6 flex flex-col items-center">
++                      <div className="w-full mt-5 flex flex-col items-center">
+                         <div className="text-left">
+-                          <span className="text-[15px] font-bold text-black block mb-1.5 text-center">
++                          <span className="text-[15px] font-bold text-black block mb-2 text-center">
+                             Pour que votre vérification soit réussie :
+                           </span>
+                           <ul className="space-y-1 text-[15px] text-black font-bold">
+                             <li className="flex items-start">
+-                              <span className="mr-2 shrink-0">•</span>
++                              <span className="mr-2 shrink-0">●</span>
+                               <span>Votre visage doit être clairement visible</span>
+                             </li>
+                             <li className="flex items-start">
+-                              <span className="mr-2 shrink-0">•</span>
++                              <span className="mr-2 shrink-0">●</span>
+                               <span>Vous devez prendre exactement la même pose</span>
+                             </li>
+                           </ul>
+                         </div>
+                       </div>
+ 
+                       {/* Smaller Legal Disclaimer */}
+-                      <p className="text-[15px] text-gray-500 text-center leading-[1.4] mt-6 px-1">
++                      <p className="text-[15px] text-gray-500 text-center leading-snug mt-6 px-2">
+                         Pour plus d'infos sur la façon dont nous utilisons, conservons et protégeons vos données personnelles, consultez notre Politique de Confidentialité.
+                       </p>
+ 
+                       {/* Main Big Pill Button */}
+                       <button 
+                         onClick={startCameraVerification}
+-                        className="w-full bg-[#111111] hover:bg-black text-white font-bold py-4 rounded-full text-[16px] transition-all mt-8 mb-10 shrink-0 active:scale-[0.98]"
++                        className="w-full bg-[#111111] hover:bg-black text-white font-bold py-4 rounded-full text-[16px] transition-all mt-6 mb-8 shrink-0 active:scale-[0.98]"
+                       >
+                         Prendre la photo
+                       </button>
+ 
+                       {/* Footer List exactly as shown in screenshot */}
+-                      <div className="w-full space-y-1 mt-auto">
+-                        <button className="w-full flex items-center justify-between py-4 text-left hover:bg-gray-50 px-1 transition-colors">
+-                          <span className="text-[15px] font-bold text-black">Consulter la Politique de Confidentialité</span>
+-                          <ChevronRight className="w-5 h-5 text-gray-500" />
+-                        </button>
+-                        <button className="w-full flex items-center justify-between py-4 text-left hover:bg-gray-50 px-1 transition-colors">
+-                          <span className="text-[15px] font-bold text-black">Pourquoi est-ce nécessaire ?</span>
+-                          <ChevronRight className="w-5 h-5 text-gray-500" />
+-                        </button>
+-                        <button className="w-full flex items-start justify-between py-4 text-left hover:bg-gray-50 px-1 transition-colors">
+-                          <span className="text-[15px] font-bold text-black pr-4 leading-snug">Contactez notre service d'aide pour retirer votre consentement</span>
+-                          <div className="w-5 h-5 rounded-full bg-gray-500 flex items-center justify-center text-[12px] font-bold text-white shrink-0 mt-0.5">i</div>
++                      <div className="w-full space-y-1">
++                        <button className="w-full flex items-center justify-between py-4 text-left hover:bg-gray-50 px-2 transition-colors">
++                          <span className="text-[15px] font-bold text-black">Consulter la Politique de Confidentialité</span>
++                          <ChevronRight className="w-5 h-5 text-gray-500" strokeWidth={2} />
++                        </button>
++                        <button className="w-full flex items-center justify-between py-4 text-left hover:bg-gray-50 px-2 transition-colors">
++                          <span className="text-[15px] font-bold text-black">Pourquoi est-ce nécessaire ?</span>
++                          <ChevronRight className="w-5 h-5 text-gray-500" strokeWidth={2} />
++                        </button>
++                        <button className="w-full flex items-start justify-between py-4 text-left hover:bg-gray-50 px-2 transition-colors">
++                          <span className="text-[15px] font-bold text-black pr-4 leading-snug mt-0.5">Contactez notre service d'aide pour retirer votre consentement</span>
++                          <div className="w-[18px] h-[18px] rounded-full bg-gray-500 flex items-center justify-center text-[11px] font-bold text-white shrink-0 mt-0.5">i</div>
+                         </button>
+                       </div>
+                     </div>
