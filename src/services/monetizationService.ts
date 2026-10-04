@@ -6,7 +6,7 @@
 import { Transaction, BoostState } from '../types';
 import { authFetch } from '../lib/authFetch';
 
-const PAYMENTS_ENABLED = false;
+const PAYMENTS_ENABLED = import.meta.env.PROD && import.meta.env.VITE_PAYMENTS_ENABLED !== 'false';
 
 export type MonetizationTier = 'free' | 'extra' | 'premium' | 'vip';
 
@@ -84,17 +84,16 @@ export const MONETIZATION_MATRIX: Record<MonetizationTier, MonetizationPermissio
 export interface CreditPackage {
   id: string;
   credits: number;
-  priceCFA: number;
   priceEUR: number;
   popular?: boolean;
   bonus?: string;
 }
 
 export const CREDIT_PACKAGES: CreditPackage[] = [
-  { id: 'pack_100', credits: 100, priceCFA: 1500, priceEUR: 2.49 },
-  { id: 'pack_550', credits: 550, priceCFA: 6000, priceEUR: 8.99, popular: true, bonus: '+10% GRATUIT' },
-  { id: 'pack_1250', credits: 1250, priceCFA: 12000, priceEUR: 17.99, bonus: '+25% GRATUIT' },
-  { id: 'pack_3000', credits: 3000, priceCFA: 25000, priceEUR: 36.99, bonus: 'BEST DEAL +50%' }
+  { id: 'pack_100', credits: 100, priceEUR: 2.49 },
+  { id: 'pack_550', credits: 550, priceEUR: 8.99, popular: true, bonus: '+10% GRATUIT' },
+  { id: 'pack_1250', credits: 1250, priceEUR: 17.99, bonus: '+25% GRATUIT' },
+  { id: 'pack_3000', credits: 3000, priceEUR: 36.99, bonus: 'BEST DEAL +50%' }
 ];
 
 export const BOOST_COST_CREDITS = 100;
@@ -327,20 +326,19 @@ class MonetizationService {
 
   public activateSubscription(status: MonetizationTier, provider: Transaction['provider']): Promise<boolean> {
     return (async () => {
-      if (status === 'free' || !PAYMENTS_ENABLED) return false;
-      const amounts: Record<'extra' | 'premium' | 'vip', number> = {
-        extra: 3500,
-        premium: 7500,
-        vip: 15000
-      };
+      if (
+        !PAYMENTS_ENABLED ||
+        (status !== 'extra' && status !== 'premium') ||
+        (status === 'extra' && provider !== 'card')
+      ) {
+        return false;
+      }
       const response = await authFetch('/api/payments/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          method: provider === 'card' ? 'card' : 'mobile_money',
-          amount: amounts[status as 'extra' | 'premium' | 'vip'],
-          currency: 'XOF',
-          description: `Abonnement Bavel ${status}`,
+          method: 'card',
+          description: `Bavel ${status}`,
           productType: 'subscription',
           productId: `${status}_1month`
         })

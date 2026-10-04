@@ -1020,28 +1020,42 @@ async function startServer() {
     return /^[A-Z]{2}$/.test(candidate) ? candidate : 'US';
   };
 
-  const PAYMENTS_ENABLED = false;
-  const creditCatalog: Record<string, { credits: number; eur: number; xof: number }> = {
-    pack_100: { credits: 100, eur: 2.49, xof: 1500 },
-    pack_550: { credits: 550, eur: 8.99, xof: 6000 },
-    pack_1250: { credits: 1250, eur: 17.99, xof: 12000 },
-    pack_3000: { credits: 3000, eur: 36.99, xof: 25000 },
-    pack_3050: { credits: 3050, eur: 59.99, xof: 39000 },
-    pack_1350: { credits: 1350, eur: 39.99, xof: 26000 },
-    pack_450: { credits: 450, eur: 19.99, xof: 13000 },
-    pack_100_show: { credits: 100, eur: 5.99, xof: 3900 }
+  const paymentsEnabled = process.env.PAYMENTS_ENABLED !== 'false';
+  const stripeSecretKey = process.env.STRIPE_SECRET_KEY || '';
+  const stripeWebhookSecret = process.env.STRIPE_WEBHOOK_SECRET || '';
+  const stripePaymentsConfigured = Boolean(
+    stripeSecretKey &&
+      /^whsec_.{16,}$/.test(stripeWebhookSecret) &&
+      (process.env.NODE_ENV !== 'production' || stripeSecretKey.startsWith('sk_live_'))
+  );
+  const mobileMoneyPaymentsConfigured = Boolean(
+    process.env.MOBILE_MONEY_CHECKOUT_URL &&
+    process.env.MOBILE_MONEY_API_KEY &&
+    process.env.MOBILE_MONEY_MERCHANT_ID &&
+    process.env.MOBILE_MONEY_WEBHOOK_SECRET
+  );
+  const PAYMENTS_ENABLED = paymentsEnabled && (stripePaymentsConfigured || mobileMoneyPaymentsConfigured);
+  const creditCatalog: Record<string, { credits: number; eur: number; xof: null }> = {
+    pack_100: { credits: 100, eur: 2.49, xof: null },
+    pack_550: { credits: 550, eur: 8.99, xof: null },
+    pack_1250: { credits: 1250, eur: 17.99, xof: null },
+    pack_3000: { credits: 3000, eur: 36.99, xof: null },
+    pack_3050: { credits: 3050, eur: 59.99, xof: null },
+    pack_1350: { credits: 1350, eur: 39.99, xof: null },
+    pack_450: { credits: 450, eur: 19.99, xof: null },
+    pack_100_show: { credits: 100, eur: 5.99, xof: null }
   };
   const subscriptionCatalog: Record<
     string,
-    { tier: 'extra' | 'premium'; eur: number; xof: number | null; durationDays: number | null }
+    { tier: 'extra' | 'premium'; eur: number; xof: null; durationDays: number | null }
   > = {
     extra_1week: { tier: 'extra', eur: 5.99, xof: null, durationDays: 7 },
-    extra_1month: { tier: 'extra', eur: 14.99, xof: 3500, durationDays: 30 },
+    extra_1month: { tier: 'extra', eur: 14.99, xof: null, durationDays: 30 },
     extra_3months: { tier: 'extra', eur: 29.99, xof: null, durationDays: 90 },
     extra_6months: { tier: 'extra', eur: 44.99, xof: null, durationDays: 180 },
     premium_1day: { tier: 'premium', eur: 5.99, xof: null, durationDays: 1 },
     premium_1week: { tier: 'premium', eur: 11.99, xof: null, durationDays: 7 },
-    premium_1month: { tier: 'premium', eur: 29.99, xof: 7500, durationDays: 30 },
+    premium_1month: { tier: 'premium', eur: 29.99, xof: null, durationDays: 30 },
     premium_3months: { tier: 'premium', eur: 59.99, xof: null, durationDays: 90 },
     premium_6months: { tier: 'premium', eur: 89.99, xof: null, durationDays: 180 },
     premium_lifetime: { tier: 'premium', eur: 149.99, xof: null, durationDays: null }
@@ -1068,10 +1082,8 @@ async function startServer() {
     const product = paymentProduct(req.body?.productType, req.body?.productId);
     if (!product) return res.status(400).json({ error: 'Produit de paiement invalide.' });
 
-    const mobileMoneyAvailable = Boolean(
-      process.env.MOBILE_MONEY_CHECKOUT_URL && process.env.MOBILE_MONEY_API_KEY && process.env.MOBILE_MONEY_MERCHANT_ID
-    );
-    const stripeAvailable = Boolean(process.env.STRIPE_SECRET_KEY);
+    const mobileMoneyAvailable = Boolean(mobileMoneyPaymentsConfigured);
+    const stripeAvailable = stripePaymentsConfigured;
     const quotes = {
       card: stripeAvailable && product.eur !== undefined ? { amount: product.eur, currency: 'EUR' } : null,
       mobile_money:
@@ -1111,16 +1123,14 @@ async function startServer() {
     if (!product) return res.status(400).json({ error: 'Produit de paiement invalide.' });
     const route = resolvePaymentCountry(req, countryCode);
     const isMobileMoney = method === 'mobile_money';
-    const mobileMoneyAvailable = Boolean(
-      process.env.MOBILE_MONEY_CHECKOUT_URL && process.env.MOBILE_MONEY_API_KEY && process.env.MOBILE_MONEY_MERCHANT_ID
-    );
+    const mobileMoneyAvailable = Boolean(mobileMoneyPaymentsConfigured);
     if (
       (isMobileMoney &&
         (!mobileMoneyAvailable ||
           !mobileMoneySupportsCountry(route) ||
           product.xof === null ||
           product.xof === undefined)) ||
-      (!isMobileMoney && !process.env.STRIPE_SECRET_KEY)
+      (!isMobileMoney && !stripePaymentsConfigured)
     ) {
       return res
         .status(503)
@@ -1801,20 +1811,14 @@ async function startServer() {
       return res.status(415).json({ error: 'Ce média ne peut pas être affiché.' });
     }
 
-    const { data: image, error: downloadError } = await db.storage
-      .from(CHAT_MEDIA_BUCKET)
-      .download(message.media_url);
+    const { data: image, error: downloadError } = await db.storage.from(CHAT_MEDIA_BUCKET).download(message.media_url);
     if (downloadError || !image) {
       console.error('Private chat image download failed:', downloadError);
       return res.status(503).json({ error: 'Téléchargement de l’image impossible.' });
     }
 
     let imageBytes = Buffer.from(await image.arrayBuffer());
-    if (
-      message.is_private_content &&
-      message.receiver_id === userId &&
-      req.query.reveal !== '1'
-    ) {
+    if (message.is_private_content && message.receiver_id === userId && req.query.reveal !== '1') {
       try {
         imageBytes = await createBlurredPrivateImagePreview(imageBytes);
       } catch (error) {
@@ -1866,10 +1870,7 @@ async function startServer() {
     }
     if (!match) return res.status(404).json({ error: 'Conversation introuvable.' });
 
-    const { data: messages, error: messagesError } = await db
-      .from('messages')
-      .select('id')
-      .eq('match_id', matchId);
+    const { data: messages, error: messagesError } = await db.from('messages').select('id').eq('match_id', matchId);
     if (messagesError) {
       console.error('Hidden chat message lookup failed:', messagesError);
       return res.status(503).json({ error: 'Messages masqués indisponibles.' });
@@ -5096,9 +5097,7 @@ Return a JSON object with:
       return res.status(404).json({ error: 'Aucune preuve photo disponible.' });
     }
 
-    const { data: image, error: downloadError } = await db.storage
-      .from(CHAT_MEDIA_BUCKET)
-      .download(evidencePath);
+    const { data: image, error: downloadError } = await db.storage.from(CHAT_MEDIA_BUCKET).download(evidencePath);
     if (downloadError || !image) {
       console.error('Moderation report evidence download failed:', downloadError);
       return res.status(503).json({ error: 'Preuve photo momentanément indisponible.' });
@@ -5352,8 +5351,7 @@ Return a JSON object with:
     }
     if (isVerified) {
       return res.status(503).json({
-        error:
-          'L’attribution de badge est désactivée tant qu’un fournisseur de vérification réel n’est pas configuré.'
+        error: 'L’attribution de badge est désactivée tant qu’un fournisseur de vérification réel n’est pas configuré.'
       });
     }
 

@@ -31,7 +31,7 @@ class AIMonetizationEngine {
     lastSwipeTime: Date.now(),
     frustrationScore: 0,
     isHesitantBuyer: false,
-    activePromotions: [],
+    activePromotions: []
   };
 
   private listeners: (() => void)[] = [];
@@ -56,7 +56,7 @@ class AIMonetizationEngine {
   }
 
   // --- 1. FRUSTRATION ANALYSIS (Churn & Pay Prediction) ---
-  
+
   /**
    * Log a right swipe. If user swipes right too many times without matches, frustration grows!
    */
@@ -72,7 +72,7 @@ class AIMonetizationEngine {
     }
 
     this.state.consecutiveRightSwipes += 1;
-    
+
     // Increase frustration score based on streak
     this.state.frustrationScore = Math.min(100, this.state.frustrationScore + 12);
 
@@ -86,7 +86,8 @@ class AIMonetizationEngine {
 
       return {
         triggerFrustrationPopup: true,
-        message: "Votre visibilité est basse à l'instant. Activez le Boost maintenant pour apparaître en priorité auprès de 10 fois plus de profils qualifiés !"
+        message:
+          "Votre visibilité est basse à l'instant. Activez le Boost maintenant pour apparaître en priorité auprès de 10 fois plus de profils qualifiés !"
       };
     }
 
@@ -122,7 +123,7 @@ class AIMonetizationEngine {
 
   public clearHesitation() {
     this.state.isHesitantBuyer = false;
-    this.state.activePromotions = this.state.activePromotions.filter(p => p.id !== 'flash_promo_hesitation');
+    this.state.activePromotions = this.state.activePromotions.filter((p) => p.id !== 'flash_promo_hesitation');
     this.save();
   }
 
@@ -137,19 +138,14 @@ class AIMonetizationEngine {
    * Leverages device status, geographic wealth, previous buys, and hesitation discounts.
    */
   public getDynamicPrices() {
-    const baseExtraCFA = 3900;
-    const basePremiumCFA = 7800;
-
     return {
       credits: CREDIT_PACKAGES,
-      extraCFA: baseExtraCFA,
-      premiumCFA: basePremiumCFA,
-      extraEUR: Math.round((baseExtraCFA / 655.95) * 100) / 100,
-      premiumEUR: Math.round((basePremiumCFA / 655.95) * 100) / 100,
+      extraEUR: 14.99,
+      premiumEUR: 29.99,
       originalExtraCFA: undefined,
       originalPremiumCFA: undefined,
       hasActiveFlashPromo: false,
-      promoTimeRemainingMs: 0,
+      promoTimeRemainingMs: 0
     };
   }
 
@@ -158,11 +154,16 @@ class AIMonetizationEngine {
   /**
    * Generates tailored affinity notifications/descriptions for blurred profiles
    */
-  public getSecretLikeRecommendation(likedProfilesCount: number): { title: string; subtitle: string; compatibilityScore: number | null } {
+  public getSecretLikeRecommendation(likedProfilesCount: number): {
+    title: string;
+    subtitle: string;
+    compatibilityScore: number | null;
+  } {
     const count = Math.max(0, Math.floor(likedProfilesCount));
     return {
       title: count === 1 ? 'Une personne a aimé ton profil.' : `${count} personnes ont aimé ton profil.`,
-      subtitle: 'La compatibilité sera calculée après comparaison réelle de vos intérêts, intentions et distance. Aucun score ne doit être inventé.',
+      subtitle:
+        'La compatibilité sera calculée après comparaison réelle de vos intérêts, intentions et distance. Aucun score ne doit être inventé.',
       compatibilityScore: null
     };
   }
@@ -173,10 +174,17 @@ class AIMonetizationEngine {
    * When user is boosted, filter candidates to favor connections with highly active, compatible users.
    * Also guarantees high matching rates!
    */
-  public optimizeCandidatesForBoostedUser<T extends { id: string | number; name: string; online?: boolean; isVerified?: boolean; verified?: boolean; compatibility_score?: number; distance?: number }>(
-    candidates: T[],
-    isBoostActive: boolean
-  ): T[] {
+  public optimizeCandidatesForBoostedUser<
+    T extends {
+      id: string | number;
+      name: string;
+      online?: boolean;
+      isVerified?: boolean;
+      verified?: boolean;
+      compatibility_score?: number;
+      distance?: number;
+    }
+  >(candidates: T[], isBoostActive: boolean): T[] {
     if (!isBoostActive) return candidates;
 
     return [...candidates].sort((a, b) => {
@@ -206,7 +214,7 @@ class AIMonetizationEngine {
    */
   public isProfileHighlyPopular(profile: any): boolean {
     if (!profile) return false;
-    
+
     if (profile.popular === true || profile.eloScore > 1400) {
       return true;
     }

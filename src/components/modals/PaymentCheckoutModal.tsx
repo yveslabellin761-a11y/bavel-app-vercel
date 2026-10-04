@@ -9,7 +9,7 @@ export interface PaymentItem {
   type: 'credits' | 'subscription';
   productId: string;
   title: string;
-  amount: string; // e.g. "59,99 €" or "3 500 FCFA"
+  amount: string;
   creditsToAdd?: number;
   creditsAmount?: number;
   subscriptionPlan?: 'extra' | 'premium';
@@ -21,7 +21,7 @@ interface PaymentCheckoutModalProps {
   onClose: () => void;
 }
 
-const PAYMENTS_ENABLED = false;
+const PAYMENTS_ENABLED = import.meta.env.PROD && import.meta.env.VITE_PAYMENTS_ENABLED !== 'false';
 
 export function PaymentCheckoutModal({ item, onClose }: PaymentCheckoutModalProps) {
   const [selectedMethod, setSelectedMethod] = useState<'mobile_money' | 'card'>('card');
@@ -89,9 +89,7 @@ export function PaymentCheckoutModal({ item, onClose }: PaymentCheckoutModalProp
 
   const quote = quotes[selectedMethod];
   const displayAmount = quote
-    ? quote.currency === 'XOF'
-      ? `${new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 0 }).format(quote.amount)} FCFA`
-      : new Intl.NumberFormat('fr-FR', { style: 'currency', currency: quote.currency }).format(quote.amount)
+    ? new Intl.NumberFormat('fr-FR', { style: 'currency', currency: quote.currency }).format(quote.amount)
     : item.amount;
 
   const handlePay = async () => {

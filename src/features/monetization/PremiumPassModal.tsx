@@ -1,13 +1,12 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Crown, Heart, RotateCcw, Sliders, Sparkles, Check, X, ShieldCheck, Zap } from 'lucide-react';
+import { Crown, Heart, RotateCcw, Sliders, Check, X, ShieldCheck } from 'lucide-react';
 import { monetizationService } from '../../services/monetizationService';
 import { aiMonetizationEngine } from '../../services/aiMonetizationEngine';
 import { useUX } from '../../context/UXContext';
 import { Button } from '../../components/ui/button';
-import { Badge } from '../../components/ui/badge';
 
-const PAYMENTS_ENABLED = false;
+const PAYMENTS_ENABLED = import.meta.env.PROD && import.meta.env.VITE_PAYMENTS_ENABLED !== 'false';
 
 interface PremiumPassModalProps {
   isOpen: boolean;
@@ -17,16 +16,15 @@ interface PremiumPassModalProps {
 
 export const PremiumPassModal: React.FC<PremiumPassModalProps> = ({ isOpen, onClose, onSuccess }) => {
   const { triggerFeedback, playSound } = useUX();
-  const [tier, setTier] = useState<'premium' | 'vip'>('vip');
   const [isProcessing, setIsProcessing] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const perks = [
     { icon: Heart, label: 'Découvrir qui a aimé votre profil sans flou' },
     { icon: RotateCcw, label: 'Annuler (Rewind) vos swipes à l’infini' },
     { icon: Sliders, label: 'Filtres de recherche avancés (taille, diplôme, vérifiés)' },
-    { icon: Zap, label: '1 Boost mensuel gratuit offert (valeur 100 crédits)' },
-    { icon: ShieldCheck, label: 'Messages prioritaires et badge VIP doré' }
+    { icon: ShieldCheck, label: 'Messages prioritaires' }
   ];
 
   const handleSubscribe = async () => {
@@ -34,7 +32,7 @@ export const PremiumPassModal: React.FC<PremiumPassModalProps> = ({ isOpen, onCl
     setIsProcessing(true);
     triggerFeedback('medium');
 
-    const ok = await monetizationService.activateSubscription(tier, 'mobile_money');
+    const ok = await monetizationService.activateSubscription('premium', 'card');
     setIsProcessing(false);
 
     if (ok) {
@@ -44,6 +42,8 @@ export const PremiumPassModal: React.FC<PremiumPassModalProps> = ({ isOpen, onCl
       triggerFeedback('heavy');
       onSuccess?.();
       onClose();
+    } else {
+      setErrorMessage('Le paiement Premium est indisponible. Aucun débit n’a été effectué.');
     }
   };
 
@@ -72,7 +72,7 @@ export const PremiumPassModal: React.FC<PremiumPassModalProps> = ({ isOpen, onCl
                 <Crown className="w-5 h-5" />
               </div>
               <div>
-                <h3 className="text-base font-black tracking-tight">Pass Bavel VIP & Premium</h3>
+                <h3 className="text-base font-black tracking-tight">Bavel Premium</h3>
                 <p className="text-[11px] text-neutral-400">Multipliez vos opportunités de rencontres</p>
               </div>
             </div>
@@ -84,49 +84,19 @@ export const PremiumPassModal: React.FC<PremiumPassModalProps> = ({ isOpen, onCl
             </button>
           </div>
 
-          <div
-            role="status"
-            className="rounded-2xl border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-xs text-amber-100"
-          >
-            Les paiements sont temporairement suspendus. Aucune souscription ni aucun débit ne sera effectué.
-          </div>
-
-          {/* Tier Selector */}
-          <div className="grid grid-cols-2 gap-3 my-3">
+          {!PAYMENTS_ENABLED && (
             <div
-              onClick={() => {
-                triggerFeedback('light');
-                setTier('premium');
-              }}
-              className={`p-3 rounded-2xl cursor-pointer border-2 transition-all text-left flex flex-col justify-between ${
-                tier === 'premium' ? 'bg-rose-500/15 border-rose-500 shadow-md' : 'bg-neutral-800/60 border-neutral-700'
-              }`}
+              role="status"
+              className="rounded-2xl border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-xs text-amber-100"
             >
-              <div>
-                <p className="text-xs font-bold text-neutral-300">Premium Pass</p>
-                <p className="text-xs font-bold text-neutral-500">Indisponible</p>
-              </div>
+              Les paiements sont temporairement suspendus. Aucune souscription ni aucun débit ne sera effectué.
             </div>
+          )}
 
-            <div
-              onClick={() => {
-                triggerFeedback('light');
-                setTier('vip');
-              }}
-              className={`p-3 rounded-2xl cursor-pointer border-2 transition-all text-left relative flex flex-col justify-between ${
-                tier === 'vip'
-                  ? 'bg-amber-500/15 border-amber-500 shadow-lg shadow-amber-500/20'
-                  : 'bg-neutral-800/60 border-neutral-700'
-              }`}
-            >
-              <span className="absolute -top-2.5 right-2 px-2 py-0.5 rounded-full text-[9px] font-black bg-amber-500 text-black">
-                CONSEILLÉ
-              </span>
-              <div>
-                <p className="text-xs font-bold text-amber-400">VIP Gold Pass</p>
-                <p className="text-xs font-bold text-neutral-500">Indisponible</p>
-              </div>
-            </div>
+          <div className="my-3 rounded-2xl border border-rose-500 bg-rose-500/10 p-4">
+            <p className="text-sm font-bold text-white">Premium · 1 mois</p>
+            <p className="mt-1 text-lg font-black text-white">29,99 €</p>
+            <p className="text-[10px] text-neutral-400">Paiement ponctuel, sans renouvellement automatique.</p>
           </div>
 
           {/* Perks List */}
@@ -144,6 +114,12 @@ export const PremiumPassModal: React.FC<PremiumPassModalProps> = ({ isOpen, onCl
             })}
           </div>
 
+          {errorMessage && (
+            <p role="alert" className="mt-2 text-center text-xs text-red-300">
+              {errorMessage}
+            </p>
+          )}
+
           {/* Action CTA */}
           <div className="pt-2">
             <Button
@@ -152,10 +128,12 @@ export const PremiumPassModal: React.FC<PremiumPassModalProps> = ({ isOpen, onCl
               className="w-full h-12 rounded-2xl bg-gradient-to-r from-amber-500 to-rose-600 hover:opacity-90 text-white font-black text-sm shadow-xl shadow-amber-500/20"
             >
               <Crown className="w-4 h-4 mr-2" />
-              {isProcessing ? 'Activation...' : 'Paiements suspendus'}
+              {isProcessing ? 'Activation...' : PAYMENTS_ENABLED ? 'Continuer vers le paiement' : 'Paiements suspendus'}
             </Button>
             <p className="text-[10px] text-center text-neutral-400 mt-2">
-              Les offres ne peuvent pas être souscrites pour le moment.
+              {PAYMENTS_ENABLED
+                ? 'Paiement ponctuel par carte, sans renouvellement automatique.'
+                : 'Les offres ne peuvent pas être souscrites pour le moment.'}
             </p>
           </div>
         </motion.div>

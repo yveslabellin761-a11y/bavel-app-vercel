@@ -1,9 +1,22 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { 
-  MapPin, Heart, MessageCircle, Search, X, Sparkles,
-  Check, Trash2, Eye, EyeOff, RefreshCw, Lock, Sparkle, ArrowRight,
-  Zap, Clock
+import {
+  MapPin,
+  Heart,
+  MessageCircle,
+  Search,
+  X,
+  Sparkles,
+  Check,
+  Trash2,
+  Eye,
+  EyeOff,
+  RefreshCw,
+  Lock,
+  Sparkle,
+  ArrowRight,
+  Zap,
+  Clock
 } from 'lucide-react';
 import { saveLikeToSupabase, subscribeToLikes } from '../../../lib/supabase';
 import { ProfileModal } from '../Modals';
@@ -37,7 +50,7 @@ interface LikesTabProps {
   onActivatePremium?: () => void;
 }
 
-export function LikesTab({ 
+export function LikesTab({
   onNavigateToTab,
   likedProfiles = [],
   discussions = [],
@@ -66,7 +79,7 @@ export function LikesTab({
   const [likesSubTab, setLikesSubTab] = useState<'all' | 'new'>('all');
 
   const [searchQuery, setSearchQuery] = useState('');
-  
+
   // Profile modal inspection state
   const [inspectingProfile, setInspectingProfile] = useState<any | null>(null);
 
@@ -80,7 +93,9 @@ export function LikesTab({
   // Permission 1: Discover who liked you (Condition 1: Extra Non, Premium Oui)
   const userTier = (userProfile?.tier || (isPremium ? 'premium' : monetizationService.getUserStatus())).toLowerCase();
   const privileges = getTierPrivileges(userTier);
-  const canUnlockLikes = Boolean(isPremium || privileges.canSeeWhoLikedMe || monetizationService.hasPermission('canSeeWhoLikedYou'));
+  const canUnlockLikes = Boolean(
+    isPremium || privileges.canSeeWhoLikedMe || monetizationService.hasPermission('canSeeWhoLikedYou')
+  );
   const [showUnblurredPreview, setShowUnblurredPreview] = useState(canUnlockLikes);
 
   useEffect(() => {
@@ -91,21 +106,24 @@ export function LikesTab({
     let active = true;
     if (!userProfile?.id) return;
     authFetch('/api/likes/received')
-      .then(response => response.ok ? response.json() : Promise.reject(new Error('Likes reçus indisponibles')))
-      .then(payload => {
+      .then((response) => (response.ok ? response.json() : Promise.reject(new Error('Likes reçus indisponibles'))))
+      .then((payload) => {
         if (active && Array.isArray(payload.likes)) setServerReceivedLikes(payload.likes);
       })
-      .catch(error => console.error('Impossible de charger les likes reçus:', error));
+      .catch((error) => console.error('Impossible de charger les likes reçus:', error));
     const unsubscribe = subscribeToLikes(String(userProfile.id), (like) => {
       if (like?.is_liked !== true) return;
       authFetch('/api/likes/received')
-        .then(response => response.ok ? response.json() : null)
-        .then(payload => {
+        .then((response) => (response.ok ? response.json() : null))
+        .then((payload) => {
           if (active && Array.isArray(payload?.likes)) setServerReceivedLikes(payload.likes);
         })
-        .catch(error => console.error('Impossible de synchroniser les likes reçus:', error));
+        .catch((error) => console.error('Impossible de synchroniser les likes reçus:', error));
     });
-    return () => { active = false; unsubscribe(); };
+    return () => {
+      active = false;
+      unsubscribe();
+    };
   }, [userProfile?.id]);
 
   // AI Personalized Dynamic Offer state
@@ -117,11 +135,12 @@ export function LikesTab({
     badge?: string;
     reason?: string;
   }>({
-    title: "Premium pendant 1 jour",
-    subtitle: "Découvrez toutes les personnes à qui vous plaisez et profitez de swipes illimités ainsi que d'autres avantages Premium.",
-    price: "5,99 €",
-    actionText: "Profitez-en pour 5,99 €",
-    badge: "OFFRE FLASH"
+    title: 'Premium pendant 1 jour',
+    subtitle:
+      "Découvrez toutes les personnes à qui vous plaisez et profitez de swipes illimités ainsi que d'autres avantages Premium.",
+    price: '5,99 €',
+    actionText: 'Profitez-en pour 5,99 €',
+    badge: 'OFFRE FLASH'
   });
 
   // Fetch AI Offer dynamically tailored to user profile & activity
@@ -129,16 +148,17 @@ export function LikesTab({
     const likesCount = receivedLikes.length || 6;
     const rec = aiMonetizationEngine.getSecretLikeRecommendation(likesCount);
     const dynamicPrices = aiMonetizationEngine.getDynamicPrices();
-    
+
     setAiOffer({
       title: rec.title,
       subtitle: rec.subtitle,
       price: `${dynamicPrices.extraEUR} €`,
-      actionText: `Activer le Pass Premium • ${dynamicPrices.extraCFA.toLocaleString()} FCFA (${dynamicPrices.extraEUR} €)`,
-      badge: "ALERTE COMPATIBILITÉ",
-      reason: rec.compatibilityScore === null
-        ? "La compatibilité sera calculée après comparaison réelle des profils."
-        : `Score de compatibilité de ${rec.compatibilityScore}%`
+      actionText: `Activer le Pass Premium • ${dynamicPrices.premiumEUR.toFixed(2)} €`,
+      badge: 'ALERTE COMPATIBILITÉ',
+      reason:
+        rec.compatibilityScore === null
+          ? 'La compatibilité sera calculée après comparaison réelle des profils.'
+          : `Score de compatibilité de ${rec.compatibilityScore}%`
     });
   }, [receivedLikes.length, isPremium]);
 
@@ -149,41 +169,39 @@ export function LikesTab({
 
   // Set of matched profile IDs for status indicator
   const matchedProfileIds = useMemo(() => {
-    return new Set(
-      discussions.map(d => String(d.id || d.user_id))
-    );
+    return new Set(discussions.map((d) => String(d.id || d.user_id)));
   }, [discussions]);
 
   // Get matching liked profiles (Sent likes), eliminating duplicates
   const likedProfilesList = useMemo(() => {
-    const uniqueIds = Array.from(new Set(likedProfiles.map(id => String(id))));
+    const uniqueIds = Array.from(new Set(likedProfiles.map((id) => String(id))));
     const list = uniqueIds
-      .map(id => allProfiles.find(p => String(p.id) === id || String(p.user_id) === id))
+      .map((id) => allProfiles.find((p) => String(p.id) === id || String(p.user_id) === id))
       .filter(Boolean) as any[];
 
     if (!searchQuery.trim()) return list;
 
     const q = searchQuery.toLowerCase();
-    return list.filter(p => 
-      p.name?.toLowerCase().includes(q) || 
-      p.city?.toLowerCase().includes(q) ||
-      p.location?.toLowerCase().includes(q) ||
-      p.relation?.toLowerCase().includes(q)
+    return list.filter(
+      (p) =>
+        p.name?.toLowerCase().includes(q) ||
+        p.city?.toLowerCase().includes(q) ||
+        p.location?.toLowerCase().includes(q) ||
+        p.relation?.toLowerCase().includes(q)
     );
   }, [likedProfiles, allProfiles, searchQuery]);
 
   // Map received likes to profiles returned by the authenticated server.
   const receivedLikesProfiles = useMemo(() => {
-    const serverProfilesById = new Map(serverReceivedLikes.map(profile => [String(profile.id), profile]));
-    const uniqueIds = Array.from(new Set([
-      ...receivedLikes.map(id => String(id)),
-      ...serverReceivedLikes.map(profile => String(profile.id))
-    ]));
+    const serverProfilesById = new Map(serverReceivedLikes.map((profile) => [String(profile.id), profile]));
+    const uniqueIds = Array.from(
+      new Set([...receivedLikes.map((id) => String(id)), ...serverReceivedLikes.map((profile) => String(profile.id))])
+    );
     let list = uniqueIds
-      .map(id => allProfiles.find(p => String(p.user_id) === id || String(p.id) === id))
+      .map((id) => allProfiles.find((p) => String(p.user_id) === id || String(p.id) === id))
       .map((p, index) => p || serverProfilesById.get(uniqueIds[index]))
       .filter(Boolean)
-      .map(p => ({
+      .map((p) => ({
         id: p.id || p.user_id,
         name: p.name,
         age: p.age,
@@ -202,10 +220,7 @@ export function LikesTab({
     if (!searchQuery.trim()) return list;
 
     const q = searchQuery.toLowerCase();
-    return list.filter(p => 
-      p.name?.toLowerCase().includes(q) || 
-      p.location?.toLowerCase().includes(q)
-    );
+    return list.filter((p) => p.name?.toLowerCase().includes(q) || p.location?.toLowerCase().includes(q));
   }, [receivedLikes, serverReceivedLikes, allProfiles, matchedProfileIds, searchQuery, likesSubTab]);
 
   // Handle Match / Like Back (Création automatique du Match réciproque & Affichage immédiat de la bannière de Match)
@@ -216,7 +231,9 @@ export function LikesTab({
 
     // 2. Retour haptique doux
     if (typeof window !== 'undefined' && 'vibrate' in navigator) {
-      try { navigator.vibrate([40, 30, 80]); } catch {}
+      try {
+        navigator.vibrate([40, 30, 80]);
+      } catch {}
     }
 
     // 3. Chime sonore de Match
@@ -259,7 +276,7 @@ export function LikesTab({
     } catch (err) {
       setMatchedProfile(null);
       if (showToast) showToast('Impossible de confirmer ce match. Réessayez.');
-      console.error("Failed to persist match:", err);
+      console.error('Failed to persist match:', err);
     } finally {
       setActionLoadingId(null);
     }
@@ -274,7 +291,9 @@ export function LikesTab({
     try {
       // Haptic feedback
       if (typeof window !== 'undefined' && 'vibrate' in navigator) {
-        try { navigator.vibrate(30); } catch {}
+        try {
+          navigator.vibrate(30);
+        } catch {}
       }
 
       if (onDismissReceivedLike) {
@@ -285,7 +304,7 @@ export function LikesTab({
       }
       if (loadSupabaseData) await loadSupabaseData();
     } catch (err) {
-      console.warn("Failed to dismiss like:", err);
+      console.warn('Failed to dismiss like:', err);
     } finally {
       setActionLoadingId(null);
     }
@@ -303,7 +322,7 @@ export function LikesTab({
       }
       if (loadSupabaseData) await loadSupabaseData();
     } catch (err) {
-      console.warn("Failed to remove like:", err);
+      console.warn('Failed to remove like:', err);
     } finally {
       setActionLoadingId(null);
     }
@@ -312,15 +331,11 @@ export function LikesTab({
   return (
     <div className="pt-2 sm:pt-4 bg-white relative pb-20 min-h-screen font-sans">
       {/* 1-Day Premium Unlock Modal */}
-      {showOneDayPremium && (
-        <OneDayPremiumModal 
-          onClose={() => setShowOneDayPremium(false)}
-        />
-      )}
+      {showOneDayPremium && <OneDayPremiumModal onClose={() => setShowOneDayPremium(false)} />}
 
       {/* Bavel Premium Modal (IMG_4262.PNG) - Likes & Admirers unlock */}
       {showPremiumModal && (
-        <BavelPremiumModal 
+        <BavelPremiumModal
           initialSlideId="likes"
           likesCount={receivedLikesProfiles.length || 1}
           onClose={() => setShowPremiumModal(false)}
@@ -335,34 +350,32 @@ export function LikesTab({
 
       {/* Monetization & Feature Modals */}
       {showWantMoreLikes && (
-        <WantMoreLikesModal 
-          onClose={() => setShowWantMoreLikes(false)} 
+        <WantMoreLikesModal
+          onClose={() => setShowWantMoreLikes(false)}
           onOpenRecharge={() => {
             setShowWantMoreLikes(false);
             setShowRechargeCredits(true);
-          }} 
+          }}
           userPhotos={userPhotos}
         />
       )}
       {showExtraShows && (
-        <ExtraShowsMenu 
-          onClose={() => setShowExtraShows(false)} 
+        <ExtraShowsMenu
+          onClose={() => setShowExtraShows(false)}
           onOpenRecharge={() => {
             setShowExtraShows(false);
             setShowRechargeCredits(true);
-          }} 
+          }}
         />
       )}
-      {showRechargeCredits && (
-        <RechargeCreditsMenu onClose={() => setShowRechargeCredits(false)} />
-      )}
+      {showRechargeCredits && <RechargeCreditsMenu onClose={() => setShowRechargeCredits(false)} />}
 
       {/* Inspect Profile Modal */}
       {inspectingProfile && (
         <ProfileModal
           profile={inspectingProfile}
           onClose={() => setInspectingProfile(null)}
-          isLiked={likedProfiles.some(id => String(id) === String(inspectingProfile.id || inspectingProfile.user_id))}
+          isLiked={likedProfiles.some((id) => String(id) === String(inspectingProfile.id || inspectingProfile.user_id))}
           onLike={() => {
             handleLikeBack(inspectingProfile);
             setInspectingProfile(null);
@@ -379,7 +392,7 @@ export function LikesTab({
       <AnimatePresence>
         {matchedProfile && (
           <div className="fixed inset-0 z-[400] flex items-center justify-center p-4 bg-black/85 backdrop-blur-md">
-            <motion.div 
+            <motion.div
               initial={{ scale: 0.82, opacity: 0, y: 30 }}
               animate={{ scale: 1, opacity: 1, y: 0 }}
               exit={{ scale: 0.82, opacity: 0, y: 30 }}
@@ -387,7 +400,7 @@ export function LikesTab({
               className="bg-gradient-to-b from-neutral-900 via-neutral-900 to-black text-white rounded-[32px] max-w-sm w-full p-6 text-center shadow-2xl relative overflow-hidden border border-white/15"
             >
               {/* Top Banner Tag */}
-              <motion.div 
+              <motion.div
                 initial={{ y: -15, opacity: 0 }}
                 animate={{ y: 0, opacity: 1 }}
                 transition={{ delay: 0.1, type: 'spring' }}
@@ -396,36 +409,43 @@ export function LikesTab({
                 <span>🔥 C'EST UN MATCH !</span>
               </motion.div>
 
-              <h2 className="text-[20px] font-black text-white tracking-tight mb-1">
-                Coup de foudre partagé !
-              </h2>
+              <h2 className="text-[20px] font-black text-white tracking-tight mb-1">Coup de foudre partagé !</h2>
               <p className="text-gray-300 text-[13px] font-medium leading-snug mb-6 max-w-[270px] mx-auto">
-                Vous et <span className="font-bold text-white underline decoration-rose-500 underline-offset-4">{matchedProfile.name}</span> vous vous plaisez mutuellement.
+                Vous et{' '}
+                <span className="font-bold text-white underline decoration-rose-500 underline-offset-4">
+                  {matchedProfile.name}
+                </span>{' '}
+                vous vous plaisez mutuellement.
               </p>
 
               {/* Dual Avatars with Match Heart */}
               <div className="flex items-center justify-center -space-x-4 mb-7 relative">
-                <motion.div 
+                <motion.div
                   initial={{ x: -30, rotate: -8, opacity: 0 }}
                   animate={{ x: 0, rotate: -4, opacity: 1 }}
                   transition={{ delay: 0.15, type: 'spring' }}
                   className="w-22 h-22 rounded-full overflow-hidden border-3 border-white shadow-xl bg-gray-800 relative"
                 >
-                  <img 
-                    src={userPhotos[0] || (userProfile?.avatarUrl) || ''} 
-                    alt="Vous" 
+                  <img
+                    src={userPhotos[0] || userProfile?.avatarUrl || ''}
+                    alt="Vous"
                     className="w-full h-full object-cover"
                   />
                 </motion.div>
-                <motion.div 
+                <motion.div
                   initial={{ x: 30, rotate: 8, opacity: 0 }}
                   animate={{ x: 0, rotate: 4, opacity: 1 }}
                   transition={{ delay: 0.15, type: 'spring' }}
                   className="w-22 h-22 rounded-full overflow-hidden border-3 border-[#e20030] shadow-xl bg-gray-800 relative z-10"
                 >
-                  <img 
-                    src={matchedProfile.img || matchedProfile.avatarUrl || (matchedProfile.photos && matchedProfile.photos[0]) || ''} 
-                    alt={matchedProfile.name} 
+                  <img
+                    src={
+                      matchedProfile.img ||
+                      matchedProfile.avatarUrl ||
+                      (matchedProfile.photos && matchedProfile.photos[0]) ||
+                      ''
+                    }
+                    alt={matchedProfile.name}
                     className="w-full h-full object-cover"
                   />
                 </motion.div>
@@ -462,9 +482,7 @@ export function LikesTab({
 
       {/* Header text and subtitle */}
       <div className="px-5 pt-4 pb-4">
-        <h1 className="text-[26px] font-bold text-black mb-1.5">
-          Voici vos Likes
-        </h1>
+        <h1 className="text-[26px] font-bold text-black mb-1.5">Voici vos Likes</h1>
         <p className="text-[15px] text-gray-500 leading-snug pr-2">
           Plus vite vous renvoyez un Like, plus grandes sont vos chances de discuter et de vous rencontrer !
         </p>
@@ -495,9 +513,7 @@ export function LikesTab({
         >
           <span>Tous les Likes</span>
           {!isPremium && <Lock className="w-3.5 h-3.5 stroke-[2.5]" />}
-          {likesSubTab === 'all' && (
-            <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-black" />
-          )}
+          {likesSubTab === 'all' && <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-black" />}
         </button>
 
         <button
@@ -513,9 +529,7 @@ export function LikesTab({
         >
           <span>Nouveaux Likes</span>
           {!isPremium && <Lock className="w-3.5 h-3.5 stroke-[2.5]" />}
-          {likesSubTab === 'new' && (
-            <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-black" />
-          )}
+          {likesSubTab === 'new' && <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-black" />}
         </button>
       </div>
 
@@ -526,32 +540,38 @@ export function LikesTab({
         {receivedLikesProfiles.length > 0 ? (
           <div className="grid grid-cols-2 gap-3">
             {receivedLikesProfiles.map((p) => (
-              <div key={p.id} className="rounded-xl overflow-hidden border border-gray-100 shadow-sm bg-white flex flex-col">
+              <div
+                key={p.id}
+                className="rounded-xl overflow-hidden border border-gray-100 shadow-sm bg-white flex flex-col"
+              >
                 {/* Image */}
-                <div 
+                <div
                   onClick={() => {
                     if (isPremium || showUnblurredPreview) {
                       setInspectingProfile(p.profile);
-                      pushNotificationService.triggerProfileViewPush(p.profile.name || p.name, String(p.profile.id || p.id));
+                      pushNotificationService.triggerProfileViewPush(
+                        p.profile.name || p.name,
+                        String(p.profile.id || p.id)
+                      );
                     } else {
                       setShowPremiumModal(true);
                     }
                   }}
                   className="relative flex-1 w-full bg-gray-100 min-h-[120px]"
                 >
-                  <img 
-                    src={p.img} 
-                    alt={p.name || 'Admirateur'} 
+                  <img
+                    src={p.img}
+                    alt={p.name || 'Admirateur'}
                     loading="lazy"
                     decoding="async"
                     className={`w-full h-full absolute inset-0 object-cover ${
                       !isPremium && !showUnblurredPreview ? 'filter blur-md scale-110' : ''
-                    }`} 
+                    }`}
                   />
                 </div>
                 {/* Bottom Bar */}
                 <div className="flex h-7 bg-white divide-x divide-gray-100 shrink-0 border-t border-gray-100">
-                  <button 
+                  <button
                     onClick={(e) => {
                       e.stopPropagation();
                       handleDismiss(p.profile);
@@ -560,7 +580,7 @@ export function LikesTab({
                   >
                     <X className="w-5 h-5 text-black" strokeWidth={2} />
                   </button>
-                  <button 
+                  <button
                     onClick={(e) => {
                       e.stopPropagation();
                       if (!isPremium && !showUnblurredPreview) {
@@ -578,7 +598,7 @@ export function LikesTab({
             ))}
 
             {/* Promo Card */}
-            <div 
+            <div
               onClick={() => setShowExtraShows(true)}
               className="rounded-xl border border-gray-200 bg-white flex flex-col items-center justify-between p-3 shadow-sm relative min-h-[120px] cursor-pointer hover:border-gray-300 transition-colors"
             >
@@ -601,7 +621,7 @@ export function LikesTab({
               </p>
 
               {/* Button */}
-              <button 
+              <button
                 onClick={(e) => {
                   e.stopPropagation();
                   setShowExtraShows(true);
@@ -621,9 +641,10 @@ export function LikesTab({
             </div>
             <h4 className="text-[15px] font-black text-black mb-1">Aucun like reçu pour le moment</h4>
             <p className="text-[12px] text-gray-500 mb-4 max-w-[240px] mx-auto leading-relaxed">
-              Ajoutez de nouvelles photos ou explorez les profils dans l'onglet Rencontres pour déclencher des coups de cœur !
+              Ajoutez de nouvelles photos ou explorez les profils dans l'onglet Rencontres pour déclencher des coups de
+              cœur !
             </p>
-            <button 
+            <button
               onClick={() => onNavigateToTab?.('encounters')}
               className="bg-black text-white text-[12.5px] font-bold px-6 py-2.5 rounded-full shadow-xs active:scale-95 transition-transform cursor-pointer"
             >
