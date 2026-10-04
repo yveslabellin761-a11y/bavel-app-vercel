@@ -212,10 +212,7 @@ test('private chat safety actions are service-only and keep reported image evide
     migration,
     /REVOKE ALL ON FUNCTION public\.report_private_chat_image\(UUID, UUID\)[\s\S]*FROM PUBLIC, anon, authenticated/i
   );
-  assert.match(
-    migration,
-    /GRANT EXECUTE ON FUNCTION public\.report_private_chat_image\(UUID, UUID\) TO service_role/i
-  );
+  assert.match(migration, /GRANT EXECUTE ON FUNCTION public\.report_private_chat_image\(UUID, UUID\) TO service_role/i);
   assert.match(migration, /evidence_urls @> ARRAY\[OLD\.media_url\]/i);
   assert.match(migration, /NEW\.status IN \('resolved', 'dismissed'\)/i);
 });
@@ -248,10 +245,7 @@ test('private chat reports remove both directional match rows', async () => {
     migration,
     /REVOKE ALL ON FUNCTION public\.report_private_chat_image\(UUID, UUID\)[\s\S]*FROM PUBLIC, anon, authenticated/i
   );
-  assert.match(
-    migration,
-    /GRANT EXECUTE ON FUNCTION public\.report_private_chat_image\(UUID, UUID\) TO service_role/i
-  );
+  assert.match(migration, /GRANT EXECUTE ON FUNCTION public\.report_private_chat_image\(UUID, UUID\) TO service_role/i);
 });
 
 test('timestamped Supabase migrations stay identical to the numbered repair scripts', async () => {
@@ -277,8 +271,14 @@ test('timestamped Supabase migrations stay identical to the numbered repair scri
       'supabase/migrations/20260930125700_payment_catalog_and_gamification_rewards.sql'
     ],
     ['supabase/29_profile_photo_verification.sql', 'supabase/migrations/20260930125800_profile_photo_verification.sql'],
-    ['supabase/36_private_chat_safety_actions.sql', 'supabase/migrations/20261004012300_private_chat_safety_actions.sql'],
-    ['supabase/37_private_chat_report_unmatch.sql', 'supabase/migrations/20261004020000_private_chat_report_unmatch.sql']
+    [
+      'supabase/36_private_chat_safety_actions.sql',
+      'supabase/migrations/20261004012300_private_chat_safety_actions.sql'
+    ],
+    [
+      'supabase/37_private_chat_report_unmatch.sql',
+      'supabase/migrations/20261004020000_private_chat_report_unmatch.sql'
+    ]
   ];
   for (const [source, migration] of pairs) {
     assert.equal(await readSql(source), await readSql(migration));
