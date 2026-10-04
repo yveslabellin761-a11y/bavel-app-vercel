@@ -1059,6 +1059,9 @@ async function startServer() {
   };
 
   app.post('/api/payments/route', verifySupabaseToken, requireAuth, async (req, res) => {
+    if (process.env.PAYMENTS_ENABLED !== 'true') {
+      return res.status(503).json({ error: 'Les paiements sont temporairement suspendus.' });
+    }
     const countryCode = resolvePaymentCountry(req, req.body?.countryCode);
     const requestedMethod = String(req.body?.method || 'auto');
     const product = paymentProduct(req.body?.productType, req.body?.productId);
@@ -1095,6 +1098,9 @@ async function startServer() {
   });
 
   app.post('/api/payments/checkout', verifySupabaseToken, requireAuth, async (req, res) => {
+    if (process.env.PAYMENTS_ENABLED !== 'true') {
+      return res.status(503).json({ error: 'Les paiements sont temporairement suspendus.' });
+    }
     const userId = String((req as any).userId || '');
     const { method, countryCode, description, productId, productType } = req.body || {};
     if (!['card', 'mobile_money'].includes(method)) {
@@ -5326,218 +5332,132 @@ Return a JSON object with:
         description,
         status: 'pending'
       });
-
-      app.get('/api/admin/reports', verifySupabaseToken, requireAdmin, async (req, res) => {
-        try {
-          const db = serverSupabase.getServiceClient();
-          const { data, error } = await db
-            .from('reports')
-            .select('id,reporter_id,reported_id,category,description,status,created_at')
-            .order('created_at', { ascending: false })
-            .limit(500);
-          if (error) throw error;
-          const ids = [...new Set((data || []).flatMap((row: any) => [row.reporter_id, row.reported_id]))];
-          const { data: profiles, error: profilesError } = ids.length
-            ? await db.from('profiles').select('id,name').in('id', ids)
-            : { data: [], error: null };
-          if (profilesError) throw profilesError;
-          const names = new Map((profiles || []).map((profile: any) => [String(profile.id), profile.name]));
-          return res.json({
-            reports: (data || []).map((row: any) => ({
-              id: row.id,
-              reporterId: row.reporter_id,
-              reporterName: names.get(String(row.reporter_id)) || 'Utilisateur',
-              reportedId: row.reported_id,
-              reportedName: names.get(String(row.reported_id)) || 'Utilisateur',
-              reason: row.category,
-              details: row.description,
-              date: new Date(row.created_at).toLocaleString('fr-FR'),
-              timestamp: new Date(row.created_at).getTime(),
-              status: row.status,
-              priority: row.category === 'scam' || row.category === 'fake_profile' ? 'high' : 'medium',
-              category: row.category === 'inappropriate_content' ? 'inappropriate' : row.category
-            }))
-          });
-        } catch (error) {
-          console.error('Admin reports query failed:', error);
-          return res.status(503).json({ error: 'Signalements indisponibles.' });
-        }
-      });
-
-      app.patch('/api/admin/profiles/:profileId/verification', verifySupabaseToken, requireAdmin, async (req, res) => {
-        const profileId = String(req.params.profileId || '');
-        const isVerified = req.body?.isVerified;
-        if (
-          !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(profileId) ||
-          typeof isVerified !== 'boolean'
-        ) {
-          return res.status(400).json({ error: 'Profil ou statut de vérification invalide.' });
-        }
-        if (isVerified) {
-          return res.status(503).json({
-            error:
-              'L’attribution de badge est désactivée tant qu’un fournisseur de vérification réel n’est pas configuré.'
-          });
-        }
-
-        try {
-          const { data, error } = await serverSupabase
-            .getServiceClient()
-            .from('profiles')
-            .update({ is_verified: isVerified, updated_at: new Date().toISOString() })
-            .eq('id', profileId)
-            .select('id,is_verified')
-            .maybeSingle();
-          if (error) throw error;
-          if (!data) return res.status(404).json({ error: 'Profil introuvable.' });
-          return res.json({ success: true, profile: data });
-        } catch (error) {
-          console.error('Admin profile verification update failed:', error);
-          return res.status(503).json({ error: 'Statut de vérification indisponible.' });
-        }
-      });
-
-      app.patch('/api/admin/profiles/:profileId/status', verifySupabaseToken, requireAdmin, async (req, res) => {
-        const profileId = String(req.params.profileId || '');
-        const updates: Record<string, unknown> = { updated_at: new Date().toISOString() };
-        if (typeof req.body?.isSuspended === 'boolean') {
-          updates.is_suspended = req.body.isSuspended;
-        } else if (req.body?.tier === 'vip' || req.body?.tier === 'freemium') {
-          updates.tier = req.body.tier;
-        } else {
-          return res.status(400).json({ error: 'Statut de compte invalide.' });
-        }
-        if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(profileId)) {
-          return res.status(400).json({ error: 'Identifiant de profil invalide.' });
-        }
-
-        try {
-          const { data, error } = await serverSupabase
-            .getServiceClient()
-            .from('profiles')
-            .update(updates)
-            .eq('id', profileId)
-            .select('id,is_suspended,tier')
-            .maybeSingle();
-          if (error) throw error;
-          if (!data) return res.status(404).json({ error: 'Profil introuvable.' });
-          return res.json({ success: true, profile: data });
-        } catch (error) {
-          console.error('Admin profile status update failed:', error);
-          return res.status(503).json({ error: 'Statut du profil indisponible.' });
-        }
-      });
-
-      app.post('/api/admin/profiles/:profileId/credits', verifySupabaseToken, requireAdmin, async (req, res) => {
-        const profileId = String(req.params.profileId || '');
-        const amount = Number(req.body?.amount);
-        const referenceId = String(req.body?.referenceId || '');
-        const description = String(req.body?.description || '');
-        const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-        if (
-          !uuidPattern.test(profileId) ||
-          !uuidPattern.test(referenceId) ||
-          !Number.isInteger(amount) ||
-          amount === 0 ||
-          Math.abs(amount) > 1000000 ||
-          !description.trim() ||
-          description.length > 500
-        ) {
-          return res.status(400).json({ error: 'Ajustement de crédits invalide.' });
-        }
-
-        try {
-          const { data, error } = await serverSupabase.getServiceClient().rpc('admin_adjust_user_credits', {
-            p_user_id: profileId,
-            p_amount: amount,
-            p_reference_id: referenceId,
-            p_description: description.trim()
-          });
-          if (error) {
-            if (/insufficient credits/i.test(error.message)) {
-              return res.status(409).json({ error: 'Solde de crédits insuffisant.' });
-            }
-            throw error;
-          }
-          return res.json({ success: true, balance: Number(data) });
-        } catch (error) {
-          console.error('Admin credit adjustment failed:', error);
-          return res.status(503).json({ error: 'Ajustement des crédits indisponible.' });
-        }
-      });
-
-      app.post('/api/admin/credits/bonus', verifySupabaseToken, requireAdmin, async (req, res) => {
-        const amount = Number(req.body?.amount);
-        const referenceId = String(req.body?.referenceId || '');
-        if (!Number.isInteger(amount) || amount <= 0 || amount > 1000 || !/^[0-9a-f-]{36}$/i.test(referenceId)) {
-          return res.status(400).json({ error: 'Bonus communautaire invalide.' });
-        }
-        try {
-          const { data, error } = await serverSupabase.getServiceClient().rpc('admin_grant_community_credits', {
-            p_amount: amount,
-            p_reference_id: referenceId
-          });
-          if (error) throw error;
-          return res.json({ success: true, affectedUsers: Number(data) });
-        } catch (error) {
-          console.error('Admin community credit grant failed:', error);
-          return res.status(503).json({ error: 'Le bonus communautaire est indisponible.' });
-        }
-      });
-
-      app.patch('/api/admin/reports/:reportId', verifySupabaseToken, requireAdmin, async (req, res) => {
-        const status = String(req.body?.status || '');
-        const allowedStatuses = new Set(['pending', 'investigating', 'resolved', 'dismissed']);
-        if (!allowedStatuses.has(status)) return res.status(400).json({ error: 'Statut de signalement invalide.' });
-        try {
-          const db = serverSupabase.getServiceClient();
-          const { data: report, error: reportError } = await db
-            .from('reports')
-            .select('id,reported_id,description,category')
-            .eq('id', req.params.reportId)
-            .maybeSingle();
-          if (reportError) throw reportError;
-          if (!report) return res.status(404).json({ error: 'Signalement introuvable.' });
-          const { data, error } = await db
-            .from('reports')
-            .update({
-              status,
-              resolved_at: ['resolved', 'dismissed'].includes(status) ? new Date().toISOString() : null
-            })
-            .eq('id', req.params.reportId)
-            .select('id,status')
-            .single();
-          if (error) throw error;
-          if (status === 'resolved' && req.body?.action === 'suspend') {
-            await db
-              .from('profiles')
-              .update({ is_suspended: true, updated_at: new Date().toISOString() })
-              .eq('id', report.reported_id);
-            await db.from('sanctions').insert({
-              user_id: report.reported_id,
-              admin_id: String((req as any).userId),
-              sanction_type: 'suspension',
-              reason: report.description || report.category
-            });
-          }
-          await db.from('admin_actions').insert({
-            admin_id: String((req as any).userId),
-            target_user_id: report.reported_id,
-            action_type: `report_${status}`,
-            description: `Signalement ${status}`,
-            reason: report.description || report.category
-          });
-          return res.json({ success: true, report: data });
-        } catch (error) {
-          console.error('Admin report update failed:', error);
-          return res.status(503).json({ error: 'Impossible de mettre à jour le signalement.' });
-        }
-      });
       if (error) throw error;
       return res.json({ success: true });
     } catch (error) {
       console.error('Erreur signalement Rencontres:', error);
       return res.status(500).json({ success: false, error: 'Signalement impossible.' });
+    }
+  });
+
+  app.patch('/api/admin/profiles/:profileId/verification', verifySupabaseToken, requireAdmin, async (req, res) => {
+    const profileId = String(req.params.profileId || '');
+    const isVerified = req.body?.isVerified;
+    if (
+      !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(profileId) ||
+      typeof isVerified !== 'boolean'
+    ) {
+      return res.status(400).json({ error: 'Profil ou statut de vérification invalide.' });
+    }
+    if (isVerified) {
+      return res.status(503).json({
+        error:
+          'L’attribution de badge est désactivée tant qu’un fournisseur de vérification réel n’est pas configuré.'
+      });
+    }
+
+    try {
+      const { data, error } = await serverSupabase
+        .getServiceClient()
+        .from('profiles')
+        .update({ is_verified: isVerified, updated_at: new Date().toISOString() })
+        .eq('id', profileId)
+        .select('id,is_verified')
+        .maybeSingle();
+      if (error) throw error;
+      if (!data) return res.status(404).json({ error: 'Profil introuvable.' });
+      return res.json({ success: true, profile: data });
+    } catch (error) {
+      console.error('Admin profile verification update failed:', error);
+      return res.status(503).json({ error: 'Statut de vérification indisponible.' });
+    }
+  });
+
+  app.patch('/api/admin/profiles/:profileId/status', verifySupabaseToken, requireAdmin, async (req, res) => {
+    const profileId = String(req.params.profileId || '');
+    const updates: Record<string, unknown> = { updated_at: new Date().toISOString() };
+    if (typeof req.body?.isSuspended === 'boolean') {
+      updates.is_suspended = req.body.isSuspended;
+    } else if (req.body?.tier === 'vip' || req.body?.tier === 'freemium') {
+      updates.tier = req.body.tier;
+    } else {
+      return res.status(400).json({ error: 'Statut de compte invalide.' });
+    }
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(profileId)) {
+      return res.status(400).json({ error: 'Identifiant de profil invalide.' });
+    }
+
+    try {
+      const { data, error } = await serverSupabase
+        .getServiceClient()
+        .from('profiles')
+        .update(updates)
+        .eq('id', profileId)
+        .select('id,is_suspended,tier')
+        .maybeSingle();
+      if (error) throw error;
+      if (!data) return res.status(404).json({ error: 'Profil introuvable.' });
+      return res.json({ success: true, profile: data });
+    } catch (error) {
+      console.error('Admin profile status update failed:', error);
+      return res.status(503).json({ error: 'Statut du profil indisponible.' });
+    }
+  });
+
+  app.post('/api/admin/profiles/:profileId/credits', verifySupabaseToken, requireAdmin, async (req, res) => {
+    const profileId = String(req.params.profileId || '');
+    const amount = Number(req.body?.amount);
+    const referenceId = String(req.body?.referenceId || '');
+    const description = String(req.body?.description || '');
+    const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    if (
+      !uuidPattern.test(profileId) ||
+      !uuidPattern.test(referenceId) ||
+      !Number.isInteger(amount) ||
+      amount === 0 ||
+      Math.abs(amount) > 1000000 ||
+      !description.trim() ||
+      description.length > 500
+    ) {
+      return res.status(400).json({ error: 'Ajustement de crédits invalide.' });
+    }
+
+    try {
+      const { data, error } = await serverSupabase.getServiceClient().rpc('admin_adjust_user_credits', {
+        p_user_id: profileId,
+        p_amount: amount,
+        p_reference_id: referenceId,
+        p_description: description.trim()
+      });
+      if (error) {
+        if (/insufficient credits/i.test(error.message)) {
+          return res.status(409).json({ error: 'Solde de crédits insuffisant.' });
+        }
+        throw error;
+      }
+      return res.json({ success: true, balance: Number(data) });
+    } catch (error) {
+      console.error('Admin credit adjustment failed:', error);
+      return res.status(503).json({ error: 'Ajustement des crédits indisponible.' });
+    }
+  });
+
+  app.post('/api/admin/credits/bonus', verifySupabaseToken, requireAdmin, async (req, res) => {
+    const amount = Number(req.body?.amount);
+    const referenceId = String(req.body?.referenceId || '');
+    if (!Number.isInteger(amount) || amount <= 0 || amount > 1000 || !/^[0-9a-f-]{36}$/i.test(referenceId)) {
+      return res.status(400).json({ error: 'Bonus communautaire invalide.' });
+    }
+    try {
+      const { data, error } = await serverSupabase.getServiceClient().rpc('admin_grant_community_credits', {
+        p_amount: amount,
+        p_reference_id: referenceId
+      });
+      if (error) throw error;
+      return res.json({ success: true, affectedUsers: Number(data) });
+    } catch (error) {
+      console.error('Admin community credit grant failed:', error);
+      return res.status(503).json({ error: 'Le bonus communautaire est indisponible.' });
     }
   });
 

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { X, ShieldCheck, CheckCircle2, Lock, ArrowRight, RefreshCw, AlertCircle } from 'lucide-react';
+import { X, ShieldCheck, Lock, ArrowRight, RefreshCw, AlertCircle } from 'lucide-react';
 import { triggerHaptic } from '../../utils/audio';
 import { authFetch } from '../../lib/authFetch';
 import { detectUserGeoAndLanguage } from '../../lib/autoLanguage';
@@ -25,7 +25,9 @@ export function PaymentCheckoutModal({ item, onClose }: PaymentCheckoutModalProp
   const [selectedMethod, setSelectedMethod] = useState<'mobile_money' | 'card'>('card');
   const [countryCode, setCountryCode] = useState('US');
   const [availableMethods, setAvailableMethods] = useState<Array<'mobile_money' | 'card'>>([]);
-  const [quotes, setQuotes] = useState<Partial<Record<'mobile_money' | 'card', { amount: number; currency: string }>>>({});
+  const [quotes, setQuotes] = useState<Partial<Record<'mobile_money' | 'card', { amount: number; currency: string }>>>(
+    {}
+  );
   const [isProcessing, setIsProcessing] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
@@ -67,7 +69,7 @@ export function PaymentCheckoutModal({ item, onClose }: PaymentCheckoutModalProp
       const data = await response.json().catch(() => null);
       if (!active) return;
       if (!response.ok) {
-        setErrorMessage(data?.error || 'Aucun moyen de paiement disponible.');
+        setErrorMessage(data?.error || 'Les paiements sont temporairement suspendus.');
         return;
       }
       setCountryCode(data.countryCode);
@@ -75,9 +77,11 @@ export function PaymentCheckoutModal({ item, onClose }: PaymentCheckoutModalProp
       setQuotes(data.quotes || {});
       setSelectedMethod(data.provider === 'mobile_money' ? 'mobile_money' : 'card');
     })().catch(() => {
-      if (active) setErrorMessage('Impossible de déterminer votre zone de paiement.');
+      if (active) setErrorMessage('Les paiements sont temporairement suspendus.');
     });
-    return () => { active = false; };
+    return () => {
+      active = false;
+    };
   }, [item.productId, item.type]);
 
   const quote = quotes[selectedMethod];
@@ -88,6 +92,7 @@ export function PaymentCheckoutModal({ item, onClose }: PaymentCheckoutModalProp
     : item.amount;
 
   const handlePay = async () => {
+    if (!availableMethods.includes(selectedMethod)) return;
     setErrorMessage('');
     setIsProcessing(true);
     triggerHaptic('medium');
@@ -136,7 +141,11 @@ export function PaymentCheckoutModal({ item, onClose }: PaymentCheckoutModalProp
         <div className="flex items-center justify-between px-5 pt-2 pb-3 border-b border-gray-100">
           <div>
             <h2 className="text-[17px] font-black text-black tracking-tight">Finaliser votre commande</h2>
-            <p className="text-[12px] text-gray-500 font-medium">Finalisez le paiement auprès du prestataire choisi</p>
+            <p className="text-[12px] text-gray-500 font-medium">
+              {availableMethods.length
+                ? 'Finalisez le paiement auprès du prestataire choisi'
+                : 'Les paiements sont temporairement suspendus.'}
+            </p>
           </div>
           <button
             onClick={onClose}
@@ -158,7 +167,10 @@ export function PaymentCheckoutModal({ item, onClose }: PaymentCheckoutModalProp
               <div>
                 <h3 className="text-[15px] font-extrabold text-black">{item.title}</h3>
                 <p className="text-[12px] text-gray-600">
-                  {item.description || (item.creditsToAdd ? `+${item.creditsToAdd} crédits après confirmation du paiement` : 'Activation après confirmation du paiement')}
+                  {item.description ||
+                    (item.creditsToAdd
+                      ? `+${item.creditsToAdd} crédits après confirmation du paiement`
+                      : 'Activation après confirmation du paiement')}
                 </p>
               </div>
             </div>
@@ -167,78 +179,96 @@ export function PaymentCheckoutModal({ item, onClose }: PaymentCheckoutModalProp
             </div>
           </div>
 
-          {/* Payment Method Selector */}
-          <div>
-            <label className="text-[12px] font-bold uppercase tracking-wider text-gray-500 block mb-2 px-0.5">
-              Choisissez votre mode de paiement
-            </label>
+          {availableMethods.length ? (
+            <>
+              {/* Payment Method Selector */}
+              <div>
+                <label className="text-[12px] font-bold uppercase tracking-wider text-gray-500 block mb-2 px-0.5">
+                  Choisissez votre mode de paiement
+                </label>
 
-            <div className="space-y-2">
-              {paymentMethods.filter(method => availableMethods.includes(method.id as 'mobile_money' | 'card')).map((method) => {
-                const isSelected = selectedMethod === method.id;
-                return (
-                  <div
-                    key={method.id}
-                    onClick={() => {
-                      setSelectedMethod(method.id as any);
-                      triggerHaptic('light');
-                    }}
-                    className={`p-3.5 rounded-2xl border transition-all cursor-pointer flex items-center justify-between ${
-                      isSelected
-                        ? 'border-black bg-gray-50 shadow-xs'
-                        : 'border-gray-200 bg-white hover:border-gray-300'
-                    }`}
-                  >
-                    <div className="flex items-center space-x-3">
-                      <span className="text-[20px]">{method.icon}</span>
-                      <div className="flex flex-col text-left">
-                        <div className="flex items-center space-x-2">
-                          <span className="text-[14px] font-bold text-black">{method.name}</span>
-                          <span className="text-[10px] font-extrabold px-1.5 py-0.5 bg-gray-200/70 text-gray-700 rounded-md">
-                            {method.tag}
-                          </span>
+                <div className="space-y-2">
+                  {paymentMethods
+                    .filter((method) => availableMethods.includes(method.id as 'mobile_money' | 'card'))
+                    .map((method) => {
+                      const isSelected = selectedMethod === method.id;
+                      return (
+                        <div
+                          key={method.id}
+                          onClick={() => {
+                            setSelectedMethod(method.id as any);
+                            triggerHaptic('light');
+                          }}
+                          className={`p-3.5 rounded-2xl border transition-all cursor-pointer flex items-center justify-between ${
+                            isSelected
+                              ? 'border-black bg-gray-50 shadow-xs'
+                              : 'border-gray-200 bg-white hover:border-gray-300'
+                          }`}
+                        >
+                          <div className="flex items-center space-x-3">
+                            <span className="text-[20px]">{method.icon}</span>
+                            <div className="flex flex-col text-left">
+                              <div className="flex items-center space-x-2">
+                                <span className="text-[14px] font-bold text-black">{method.name}</span>
+                                <span className="text-[10px] font-extrabold px-1.5 py-0.5 bg-gray-200/70 text-gray-700 rounded-md">
+                                  {method.tag}
+                                </span>
+                              </div>
+                              <span className="text-[11.5px] text-gray-500 mt-0.5">{method.desc}</span>
+                            </div>
+                          </div>
+
+                          <div
+                            className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 ${
+                              isSelected ? 'border-black bg-black' : 'border-gray-300'
+                            }`}
+                          >
+                            {isSelected && <div className="w-2 h-2 rounded-full bg-white" />}
+                          </div>
                         </div>
-                        <span className="text-[11.5px] text-gray-500 mt-0.5">{method.desc}</span>
-                      </div>
-                    </div>
-
-                    <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 ${
-                      isSelected ? 'border-black bg-black' : 'border-gray-300'
-                    }`}>
-                      {isSelected && <div className="w-2 h-2 rounded-full bg-white" />}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Dynamic input depending on method */}
-          {selectedMethod === 'mobile_money' ? (
-            <div className="bg-gray-50 rounded-2xl p-3.5 border border-gray-200/80 space-y-1.5">
-              <label className="text-[12px] font-bold text-gray-700">Paiement Mobile Money</label>
-              <div className="flex items-center bg-white rounded-xl border border-gray-300 px-3 py-2.5 space-x-2">
-                <span className="w-full text-[14px] font-bold text-black">Vous serez redirigé vers le prestataire pour finaliser le paiement.</span>
+                      );
+                    })}
+                </div>
               </div>
-            </div>
+
+              {/* Dynamic input depending on method */}
+              {selectedMethod === 'mobile_money' ? (
+                <div className="bg-gray-50 rounded-2xl p-3.5 border border-gray-200/80 space-y-1.5">
+                  <label className="text-[12px] font-bold text-gray-700">Paiement Mobile Money</label>
+                  <div className="flex items-center bg-white rounded-xl border border-gray-300 px-3 py-2.5 space-x-2">
+                    <span className="w-full text-[14px] font-bold text-black">
+                      Vous serez redirigé vers le prestataire pour finaliser le paiement.
+                    </span>
+                  </div>
+                </div>
+              ) : (
+                <div className="bg-gray-50 rounded-2xl p-3.5 border border-gray-200/80 text-[12px] text-gray-600">
+                  Vous serez redirigé vers Stripe. Bavel ne collecte jamais votre numéro de carte.
+                </div>
+              )}
+
+              {/* Security Assurance Guarantee */}
+              <div className="flex items-center space-x-2 py-1 text-gray-500 text-[11.5px] justify-center">
+                <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
+                <span>Paiement sécurisé • Activation après confirmation du prestataire</span>
+              </div>
+            </>
           ) : (
-            <div className="bg-gray-50 rounded-2xl p-3.5 border border-gray-200/80 text-[12px] text-gray-600">
-              Vous serez redirigé vers Stripe. Bavel ne collecte jamais votre numéro de carte.
+            <div
+              role="status"
+              className="flex items-start gap-2 rounded-2xl bg-amber-50 border border-amber-200 p-4 text-sm text-amber-900"
+            >
+              <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
+              <span>Aucun paiement ne peut être effectué pour le moment. Votre compte ne sera pas débité.</span>
             </div>
           )}
 
-          {errorMessage && (
+          {errorMessage && availableMethods.length > 0 && (
             <div className="flex items-start gap-2 rounded-2xl bg-red-50 border border-red-200 p-3 text-sm text-red-700">
               <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
               <span>{errorMessage}</span>
             </div>
           )}
-
-          {/* Security Assurance Guarantee */}
-          <div className="flex items-center space-x-2 py-1 text-gray-500 text-[11.5px] justify-center">
-            <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
-            <span>Paiement sécurisé • Activation après confirmation du prestataire</span>
-          </div>
         </div>
 
         {/* Bottom CTA */}
@@ -256,7 +286,9 @@ export function PaymentCheckoutModal({ item, onClose }: PaymentCheckoutModalProp
             ) : (
               <>
                 <Lock className="w-4 h-4" />
-                <span>Payer {displayAmount}</span>
+                <span>
+                  {availableMethods.includes(selectedMethod) ? `Payer ${displayAmount}` : 'Paiements suspendus'}
+                </span>
                 <ArrowRight className="w-4 h-4 ml-1" />
               </>
             )}

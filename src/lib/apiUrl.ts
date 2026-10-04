@@ -1,6 +1,12 @@
 import { Capacitor } from '@capacitor/core';
 
-const configuredApiUrl = import.meta.env?.VITE_API_BASE_URL?.trim();
+const PRODUCTION_API_ORIGIN = 'https://bavel-app-vercel.onrender.com';
+
+export function getConfiguredApiUrl(isProduction: boolean, configuredUrl?: string): string {
+  return configuredUrl?.trim() || (isProduction ? PRODUCTION_API_ORIGIN : '');
+}
+
+const configuredApiUrl = getConfiguredApiUrl(import.meta.env?.PROD === true, import.meta.env?.VITE_API_BASE_URL);
 
 function isNativeRuntime(): boolean {
   return (

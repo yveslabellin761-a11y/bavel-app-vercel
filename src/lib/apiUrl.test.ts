@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { after, before, test } from 'node:test';
 import { Capacitor } from '@capacitor/core';
-import { getApiUrl, getBackendBaseUrl, resolveApiRequest } from './apiUrl';
+import { getApiUrl, getBackendBaseUrl, getConfiguredApiUrl, resolveApiRequest } from './apiUrl';
 
 const originalWindow = Object.getOwnPropertyDescriptor(globalThis, 'window');
 
@@ -21,6 +21,12 @@ test('preserves the current web origin when no API origin is configured', () => 
   assert.equal(getBackendBaseUrl(), 'https://bavel.example');
   assert.equal(getApiUrl('/api/profiles'), 'https://bavel.example/api/profiles');
   assert.equal(resolveApiRequest('/api/messages'), 'https://bavel.example/api/messages');
+});
+
+test('defaults production API calls to Render unless an origin is explicitly configured', () => {
+  assert.equal(getConfiguredApiUrl(true), 'https://bavel-app-vercel.onrender.com');
+  assert.equal(getConfiguredApiUrl(true, 'https://api.example.com'), 'https://api.example.com');
+  assert.equal(getConfiguredApiUrl(false), '');
 });
 
 test('does not rewrite unrelated and absolute requests', () => {
