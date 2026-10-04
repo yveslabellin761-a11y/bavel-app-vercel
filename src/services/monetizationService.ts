@@ -6,6 +6,8 @@
 import { Transaction, BoostState } from '../types';
 import { authFetch } from '../lib/authFetch';
 
+const PAYMENTS_ENABLED = false;
+
 export type MonetizationTier = 'free' | 'extra' | 'premium' | 'vip';
 
 /**
@@ -42,7 +44,7 @@ export const MONETIZATION_MATRIX: Record<MonetizationTier, MonetizationPermissio
     hasNoAds: false,
     hasDailyCoupDeCoeur: false,
     canRewindSwipes: false,
-    hasBonusCreditsOnPurchase: false,
+    hasBonusCreditsOnPurchase: false
   },
   extra: {
     canSeeWhoLikedYou: false,
@@ -53,7 +55,7 @@ export const MONETIZATION_MATRIX: Record<MonetizationTier, MonetizationPermissio
     hasNoAds: true,
     hasDailyCoupDeCoeur: true,
     canRewindSwipes: true,
-    hasBonusCreditsOnPurchase: true,
+    hasBonusCreditsOnPurchase: true
   },
   premium: {
     canSeeWhoLikedYou: true,
@@ -64,7 +66,7 @@ export const MONETIZATION_MATRIX: Record<MonetizationTier, MonetizationPermissio
     hasNoAds: true,
     hasDailyCoupDeCoeur: true,
     canRewindSwipes: true,
-    hasBonusCreditsOnPurchase: true,
+    hasBonusCreditsOnPurchase: true
   },
   vip: {
     canSeeWhoLikedYou: true,
@@ -75,7 +77,7 @@ export const MONETIZATION_MATRIX: Record<MonetizationTier, MonetizationPermissio
     hasNoAds: true,
     hasDailyCoupDeCoeur: true,
     canRewindSwipes: true,
-    hasBonusCreditsOnPurchase: true,
+    hasBonusCreditsOnPurchase: true
   }
 };
 
@@ -92,7 +94,7 @@ export const CREDIT_PACKAGES: CreditPackage[] = [
   { id: 'pack_100', credits: 100, priceCFA: 1500, priceEUR: 2.49 },
   { id: 'pack_550', credits: 550, priceCFA: 6000, priceEUR: 8.99, popular: true, bonus: '+10% GRATUIT' },
   { id: 'pack_1250', credits: 1250, priceCFA: 12000, priceEUR: 17.99, bonus: '+25% GRATUIT' },
-  { id: 'pack_3000', credits: 3000, priceCFA: 25000, priceEUR: 36.99, bonus: 'BEST DEAL +50%' },
+  { id: 'pack_3000', credits: 3000, priceCFA: 25000, priceEUR: 36.99, bonus: 'BEST DEAL +50%' }
 ];
 
 export const BOOST_COST_CREDITS = 100;
@@ -105,7 +107,7 @@ class MonetizationService {
     isActive: false,
     startedAt: null,
     expiresAt: null,
-    multiplier: 1,
+    multiplier: 1
   };
   private listeners: (() => void)[] = [];
 
@@ -124,7 +126,12 @@ class MonetizationService {
       const payload = await response.json();
       this.credits = Number(payload.wallet?.balance || 0);
       const tier = String(payload.wallet?.tier || 'free');
-      this.userStatus = tier === 'freemium' ? 'free' : (['free', 'extra', 'premium', 'vip'].includes(tier) ? tier as MonetizationTier : 'free');
+      this.userStatus =
+        tier === 'freemium'
+          ? 'free'
+          : ['free', 'extra', 'premium', 'vip'].includes(tier)
+            ? (tier as MonetizationTier)
+            : 'free';
       const details = payload.wallet?.boost;
       if (details?.expiresAt && Number(details.expiresAt) > Date.now()) this.boostState = details;
       this.notify();
@@ -257,7 +264,11 @@ class MonetizationService {
     const response = await authFetch('/api/wallet/spend', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ amount, purpose: description.toLowerCase().includes('super') ? 'super_like' : 'profile_boost', description })
+      body: JSON.stringify({
+        amount,
+        purpose: description.toLowerCase().includes('super') ? 'super_like' : 'profile_boost',
+        description
+      })
     });
     if (!response.ok) return false;
     const payload = await response.json();
@@ -316,7 +327,7 @@ class MonetizationService {
 
   public activateSubscription(status: MonetizationTier, provider: Transaction['provider']): Promise<boolean> {
     return (async () => {
-      if (status === 'free') return false;
+      if (status === 'free' || !PAYMENTS_ENABLED) return false;
       const amounts: Record<'extra' | 'premium' | 'vip', number> = {
         extra: 3500,
         premium: 7500,
@@ -349,7 +360,7 @@ class MonetizationService {
       isActive: false,
       startedAt: null,
       expiresAt: null,
-      multiplier: 1,
+      multiplier: 1
     };
     this.notify();
   }

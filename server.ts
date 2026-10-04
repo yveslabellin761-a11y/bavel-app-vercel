@@ -1020,6 +1020,7 @@ async function startServer() {
     return /^[A-Z]{2}$/.test(candidate) ? candidate : 'US';
   };
 
+  const PAYMENTS_ENABLED = false;
   const creditCatalog: Record<string, { credits: number; eur: number; xof: number }> = {
     pack_100: { credits: 100, eur: 2.49, xof: 1500 },
     pack_550: { credits: 550, eur: 8.99, xof: 6000 },
@@ -1059,7 +1060,7 @@ async function startServer() {
   };
 
   app.post('/api/payments/route', verifySupabaseToken, requireAuth, async (req, res) => {
-    if (process.env.PAYMENTS_ENABLED !== 'true') {
+    if (!PAYMENTS_ENABLED) {
       return res.status(503).json({ error: 'Les paiements sont temporairement suspendus.' });
     }
     const countryCode = resolvePaymentCountry(req, req.body?.countryCode);
@@ -1098,7 +1099,7 @@ async function startServer() {
   });
 
   app.post('/api/payments/checkout', verifySupabaseToken, requireAuth, async (req, res) => {
-    if (process.env.PAYMENTS_ENABLED !== 'true') {
+    if (!PAYMENTS_ENABLED) {
       return res.status(503).json({ error: 'Les paiements sont temporairement suspendus.' });
     }
     const userId = String((req as any).userId || '');

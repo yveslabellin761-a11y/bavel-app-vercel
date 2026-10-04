@@ -21,6 +21,8 @@ interface PaymentCheckoutModalProps {
   onClose: () => void;
 }
 
+const PAYMENTS_ENABLED = false;
+
 export function PaymentCheckoutModal({ item, onClose }: PaymentCheckoutModalProps) {
   const [selectedMethod, setSelectedMethod] = useState<'mobile_money' | 'card'>('card');
   const [countryCode, setCountryCode] = useState('US');
@@ -53,6 +55,7 @@ export function PaymentCheckoutModal({ item, onClose }: PaymentCheckoutModalProp
   ];
 
   React.useEffect(() => {
+    if (!PAYMENTS_ENABLED) return;
     let active = true;
     (async () => {
       const geo = await detectUserGeoAndLanguage();
@@ -92,7 +95,7 @@ export function PaymentCheckoutModal({ item, onClose }: PaymentCheckoutModalProp
     : item.amount;
 
   const handlePay = async () => {
-    if (!availableMethods.includes(selectedMethod)) return;
+    if (!PAYMENTS_ENABLED || !availableMethods.includes(selectedMethod)) return;
     setErrorMessage('');
     setIsProcessing(true);
     triggerHaptic('medium');
