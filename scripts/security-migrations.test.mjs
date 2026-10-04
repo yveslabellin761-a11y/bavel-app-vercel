@@ -197,6 +197,63 @@ test('activity messages require the sender to be a confirmed participant in the 
   assert.doesNotMatch(migration, /activity_participants\.activity_id = activity_participants\.activity_id/i);
 });
 
+test('private chat safety actions are service-only and keep reported image evidence', async () => {
+  const migration = await readSql('supabase/36_private_chat_safety_actions.sql');
+  assert.match(migration, /CREATE TABLE IF NOT EXISTS public\.message_user_hides/i);
+  assert.match(migration, /ALTER TABLE public\.message_user_hides ENABLE ROW LEVEL SECURITY/i);
+  assert.match(migration, /REVOKE ALL ON TABLE public\.message_user_hides FROM PUBLIC, anon, authenticated/i);
+  assert.match(migration, /INSERT INTO public\.message_user_hides \(message_id, user_id\)/i);
+  assert.match(migration, /p_user_id NOT IN \(target_message\.sender_id, target_message\.receiver_id\)/i);
+  assert.match(migration, /p_reporter_id <> target_message\.receiver_id/i);
+  assert.match(migration, /INSERT INTO public\.reports[\s\S]*'inappropriate_content'/i);
+  assert.match(migration, /ARRAY\[target_message\.media_url\]/i);
+  assert.match(migration, /ON CONFLICT \(user_id, blocked_user_id\)/i);
+  assert.match(
+    migration,
+    /REVOKE ALL ON FUNCTION public\.report_private_chat_image\(UUID, UUID\)[\s\S]*FROM PUBLIC, anon, authenticated/i
+  );
+  assert.match(
+    migration,
+    /GRANT EXECUTE ON FUNCTION public\.report_private_chat_image\(UUID, UUID\) TO service_role/i
+  );
+  assert.match(migration, /evidence_urls @> ARRAY\[OLD\.media_url\]/i);
+  assert.match(migration, /NEW\.status IN \('resolved', 'dismissed'\)/i);
+});
+
+test('private chat image delivery serves blurred bytes until explicit reveal and preserves voice URLs', async () => {
+  const server = await readSql('server.ts');
+  const routeStart = server.indexOf("app.get('/api/messages/:messageId/media-url'");
+  const routeEnd = server.indexOf("app.post('/api/moderation/text'", routeStart);
+  assert.notEqual(routeStart, -1);
+  assert.notEqual(routeEnd, -1);
+  const mediaRoute = server.slice(routeStart, routeEnd);
+  assert.match(mediaRoute, /createBlurredPrivateImagePreview/);
+  assert.match(mediaRoute, /req\.query\.reveal !== '1'/);
+  assert.match(mediaRoute, /message\.message_type === 'voice'[\s\S]*createSignedUrl/);
+  assert.match(mediaRoute, /Cache-Control', 'private, no-store/);
+  assert.match(server, /app\.delete\('\/api\/messages\/:messageId\/hide', verifySupabaseToken, requireAuth/);
+  assert.match(server, /app\.get\('\/api\/messages\/hidden', verifySupabaseToken, requireAuth/);
+  assert.match(server, /app\.post\('\/api\/messages\/:messageId\/private-report', verifySupabaseToken, requireAuth/);
+  assert.ok(server.includes("app.post('/api/messages/:messageId/private-report'"));
+  assert.ok(server.includes("app.get('/api/admin/reports/:reportId/evidence'"));
+});
+
+test('private chat reports remove both directional match rows', async () => {
+  const migration = await readSql('supabase/37_private_chat_report_unmatch.sql');
+  assert.match(
+    migration,
+    /DELETE FROM public\.matches[\s\S]*user_id = p_reporter_id AND matched_user_id = target_message\.sender_id[\s\S]*user_id = target_message\.sender_id AND matched_user_id = p_reporter_id/i
+  );
+  assert.match(
+    migration,
+    /REVOKE ALL ON FUNCTION public\.report_private_chat_image\(UUID, UUID\)[\s\S]*FROM PUBLIC, anon, authenticated/i
+  );
+  assert.match(
+    migration,
+    /GRANT EXECUTE ON FUNCTION public\.report_private_chat_image\(UUID, UUID\) TO service_role/i
+  );
+});
+
 test('timestamped Supabase migrations stay identical to the numbered repair scripts', async () => {
   const pairs = [
     [
@@ -219,7 +276,9 @@ test('timestamped Supabase migrations stay identical to the numbered repair scri
       'supabase/35_payment_catalog_and_gamification_rewards.sql',
       'supabase/migrations/20260930125700_payment_catalog_and_gamification_rewards.sql'
     ],
-    ['supabase/29_profile_photo_verification.sql', 'supabase/migrations/20260930125800_profile_photo_verification.sql']
+    ['supabase/29_profile_photo_verification.sql', 'supabase/migrations/20260930125800_profile_photo_verification.sql'],
+    ['supabase/36_private_chat_safety_actions.sql', 'supabase/migrations/20261004012300_private_chat_safety_actions.sql'],
+    ['supabase/37_private_chat_report_unmatch.sql', 'supabase/migrations/20261004020000_private_chat_report_unmatch.sql']
   ];
   for (const [source, migration] of pairs) {
     assert.equal(await readSql(source), await readSql(migration));

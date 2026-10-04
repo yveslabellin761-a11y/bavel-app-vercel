@@ -54,6 +54,7 @@ import {
   searchProfiles
 } from './src/server/services/internalAi.js';
 import {
+  createBlurredPrivateImagePreview,
   getImageModelState,
   ImageModerationError,
   moderateImageLocally,
@@ -1561,25 +1562,7 @@ async function startServer() {
       return res.status(503).json({ error: 'Modération de l’image indisponible.' });
     }
 
-    let mediaUrl: string | null = null;
-    if (!isEphemeral) {
-      const { data: signedUrl, error: signedUrlError } = await db.storage
-        .from(CHAT_MEDIA_BUCKET)
-        .createSignedUrl(mediaPath, 900);
-      if (signedUrlError || !signedUrl?.signedUrl) {
-        const [{ error: messageCleanupError }, { error: objectCleanupError }] = await Promise.all([
-          db.from('messages').delete().eq('id', messageId),
-          db.storage.from(CHAT_MEDIA_BUCKET).remove([mediaPath])
-        ]);
-        if (messageCleanupError)
-          console.error('Failed to roll back a chat image without a signed URL:', messageCleanupError);
-        if (objectCleanupError) console.error('Failed to remove chat image without a signed URL:', objectCleanupError);
-        console.error('Private chat image URL generation failed:', signedUrlError);
-        return res.status(503).json({ error: 'Lien privé de l’image indisponible.' });
-      }
-      mediaUrl = signedUrl.signedUrl;
-    }
-    return res.status(201).json({ message, mediaUrl, moderation });
+    return res.status(201).json({ message, moderation });
   });
 
   app.post('/api/messages/voice', async (req, res) => {
@@ -1717,7 +1700,9 @@ async function startServer() {
     const db = serverSupabase.getServiceClient();
     const { data: message, error: lookupError } = await db
       .from('messages')
-      .select('id,sender_id,receiver_id,media_url,is_ephemeral,media_viewed_at,media_expires_at')
+      .select(
+        'id,sender_id,receiver_id,media_url,message_type,is_ephemeral,is_private_content,media_viewed_at,media_expires_at'
+      )
       .eq('id', messageId)
       .maybeSingle();
     if (lookupError) {
@@ -1727,6 +1712,19 @@ async function startServer() {
     if (!message || ![message.sender_id, message.receiver_id].includes(userId)) {
       return res.status(404).json({ error: 'Image introuvable.' });
     }
+    const { data: blockedRelation, error: blockError } = await db
+      .from('blocks')
+      .select('id')
+      .or(
+        `and(user_id.eq.${message.sender_id},blocked_user_id.eq.${message.receiver_id}),and(user_id.eq.${message.receiver_id},blocked_user_id.eq.${message.sender_id})`
+      )
+      .limit(1)
+      .maybeSingle();
+    if (blockError) {
+      console.error('Chat image block lookup failed:', blockError);
+      return res.status(503).json({ error: 'Vérification d’accès à l’image impossible.' });
+    }
+    if (blockedRelation) return res.status(404).json({ error: 'Image introuvable.' });
     if (message.is_ephemeral && message.sender_id === userId) {
       return res.status(403).json({ error: 'La photo éphémère est réservée à son destinataire.' });
     }
@@ -1779,17 +1777,126 @@ async function startServer() {
       return res.status(200).send(imageBytes);
     }
 
-    const lifetimeSeconds = 900;
-    const { data: signedUrl, error: signedUrlError } = await db.storage
-      .from(CHAT_MEDIA_BUCKET)
-      .createSignedUrl(message.media_url, lifetimeSeconds);
-    if (signedUrlError || !signedUrl?.signedUrl) {
-      console.error('Private chat image URL generation failed:', signedUrlError);
-      return res.status(503).json({ error: 'Lien privé de l’image indisponible.' });
+    if (message.message_type === 'voice') {
+      const lifetimeSeconds = 900;
+      const { data: signedUrl, error: signedUrlError } = await db.storage
+        .from(CHAT_MEDIA_BUCKET)
+        .createSignedUrl(message.media_url, lifetimeSeconds);
+      if (signedUrlError || !signedUrl?.signedUrl) {
+        console.error('Private chat voice URL generation failed:', signedUrlError);
+        return res.status(503).json({ error: 'Lien privé de la note vocale indisponible.' });
+      }
+      res.setHeader('Cache-Control', 'private, no-store, max-age=0');
+      return res.json({ url: signedUrl.signedUrl, expiresIn: lifetimeSeconds });
     }
 
-    res.setHeader('Cache-Control', 'no-store');
-    return res.json({ url: signedUrl.signedUrl, expiresIn: lifetimeSeconds });
+    if (message.message_type !== 'image') {
+      return res.status(415).json({ error: 'Ce média ne peut pas être affiché.' });
+    }
+
+    const { data: image, error: downloadError } = await db.storage
+      .from(CHAT_MEDIA_BUCKET)
+      .download(message.media_url);
+    if (downloadError || !image) {
+      console.error('Private chat image download failed:', downloadError);
+      return res.status(503).json({ error: 'Téléchargement de l’image impossible.' });
+    }
+
+    let imageBytes = Buffer.from(await image.arrayBuffer());
+    if (
+      message.is_private_content &&
+      message.receiver_id === userId &&
+      req.query.reveal !== '1'
+    ) {
+      try {
+        imageBytes = await createBlurredPrivateImagePreview(imageBytes);
+      } catch (error) {
+        console.error('Private chat image preview generation failed:', error);
+        return res.status(503).json({ error: 'Aperçu flouté de l’image indisponible.' });
+      }
+    }
+
+    res.setHeader('Cache-Control', 'private, no-store, max-age=0');
+    res.setHeader('Content-Type', 'image/webp');
+    res.setHeader('Content-Length', imageBytes.byteLength);
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    return res.status(200).send(imageBytes);
+  });
+
+  app.delete('/api/messages/:messageId/hide', verifySupabaseToken, requireAuth, async (req, res) => {
+    const userId = String((req as any).userId || '');
+    const messageId = String(req.params.messageId || '');
+    const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    if (!uuidPattern.test(messageId)) return res.status(404).json({ error: 'Message introuvable.' });
+
+    const { data: hidden, error } = await serverSupabase
+      .getServiceClient()
+      .rpc('hide_chat_message_for_user', { p_message_id: messageId, p_user_id: userId });
+    if (error) {
+      console.error('Private chat message hide failed:', error);
+      return res.status(503).json({ error: 'Suppression du message impossible pour le moment.' });
+    }
+    if (!hidden) return res.status(404).json({ error: 'Message introuvable.' });
+    return res.json({ success: true });
+  });
+
+  app.get('/api/messages/hidden', verifySupabaseToken, requireAuth, async (req, res) => {
+    const userId = String((req as any).userId || '');
+    const matchId = String(req.query.matchId || '');
+    const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    if (!uuidPattern.test(matchId)) return res.status(400).json({ error: 'Conversation invalide.' });
+
+    const db = serverSupabase.getServiceClient();
+    const { data: match, error: matchError } = await db
+      .from('matches')
+      .select('id')
+      .eq('id', matchId)
+      .or(`user_id.eq.${userId},matched_user_id.eq.${userId}`)
+      .maybeSingle();
+    if (matchError) {
+      console.error('Hidden chat message match lookup failed:', matchError);
+      return res.status(503).json({ error: 'Messages masqués indisponibles.' });
+    }
+    if (!match) return res.status(404).json({ error: 'Conversation introuvable.' });
+
+    const { data: messages, error: messagesError } = await db
+      .from('messages')
+      .select('id')
+      .eq('match_id', matchId);
+    if (messagesError) {
+      console.error('Hidden chat message lookup failed:', messagesError);
+      return res.status(503).json({ error: 'Messages masqués indisponibles.' });
+    }
+    const messageIds = (messages || []).map((message: any) => String(message.id));
+    if (messageIds.length === 0) return res.json({ messageIds: [] });
+
+    const { data: hiddenMessages, error: hiddenError } = await db
+      .from('message_user_hides')
+      .select('message_id')
+      .eq('user_id', userId)
+      .in('message_id', messageIds);
+    if (hiddenError) {
+      console.error('Hidden chat message list failed:', hiddenError);
+      return res.status(503).json({ error: 'Messages masqués indisponibles.' });
+    }
+    return res.json({ messageIds: (hiddenMessages || []).map((message: any) => String(message.message_id)) });
+  });
+
+  app.post('/api/messages/:messageId/private-report', verifySupabaseToken, requireAuth, async (req, res) => {
+    const userId = String((req as any).userId || '');
+    const messageId = String(req.params.messageId || '');
+    const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    if (!uuidPattern.test(messageId)) return res.status(404).json({ error: 'Message introuvable.' });
+
+    const { data: reported, error } = await serverSupabase
+      .getServiceClient()
+      .rpc('report_private_chat_image', { p_message_id: messageId, p_reporter_id: userId });
+    if (error) {
+      console.error('Private chat image report failed:', error);
+      return res.status(503).json({ error: 'Signalement et blocage impossibles pour le moment.' });
+    }
+    if (!reported) return res.status(404).json({ error: 'Photo signalable introuvable.' });
+    return res.json({ success: true });
   });
 
   app.post('/api/moderation/text', async (req, res) => {
@@ -4916,6 +5023,145 @@ Return a JSON object with:
       return res.json({ success: true, matches: data || [] });
     } catch (err: any) {
       return res.status(500).json({ success: false, matches: [] });
+    }
+  });
+
+  app.get('/api/admin/reports', verifySupabaseToken, requireAdmin, async (_req, res) => {
+    try {
+      const db = serverSupabase.getServiceClient();
+      const { data, error } = await db
+        .from('reports')
+        .select('id,reporter_id,reported_id,category,description,evidence_urls,status,created_at')
+        .order('created_at', { ascending: false })
+        .limit(500);
+      if (error) throw error;
+      const ids = [...new Set((data || []).flatMap((row: any) => [row.reporter_id, row.reported_id]))];
+      const { data: profiles, error: profilesError } = ids.length
+        ? await db.from('profiles').select('id,name').in('id', ids)
+        : { data: [], error: null };
+      if (profilesError) throw profilesError;
+      const names = new Map((profiles || []).map((profile: any) => [String(profile.id), profile.name]));
+      return res.json({
+        reports: (data || []).map((row: any) => ({
+          id: row.id,
+          reporterId: row.reporter_id,
+          reporterName: names.get(String(row.reporter_id)) || 'Utilisateur',
+          reportedId: row.reported_id,
+          reportedName: names.get(String(row.reported_id)) || 'Utilisateur',
+          reason: row.category,
+          details: row.description,
+          hasImageEvidence: Array.isArray(row.evidence_urls) && row.evidence_urls.length > 0,
+          date: new Date(row.created_at).toLocaleString('fr-FR'),
+          timestamp: new Date(row.created_at).getTime(),
+          status: row.status,
+          priority: row.category === 'scam' || row.category === 'fake_profile' ? 'high' : 'medium',
+          category: row.category === 'inappropriate_content' ? 'inappropriate' : row.category
+        }))
+      });
+    } catch (error) {
+      console.error('Admin reports query failed:', error);
+      return res.status(503).json({ error: 'Signalements indisponibles.' });
+    }
+  });
+
+  app.get('/api/admin/reports/:reportId/evidence', verifySupabaseToken, requireAdmin, async (req, res) => {
+    const reportId = String(req.params.reportId || '');
+    const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    if (!uuidPattern.test(reportId)) return res.status(404).json({ error: 'Preuve introuvable.' });
+
+    const db = serverSupabase.getServiceClient();
+    const { data: report, error: reportError } = await db
+      .from('reports')
+      .select('evidence_urls')
+      .eq('id', reportId)
+      .maybeSingle();
+    if (reportError) {
+      console.error('Moderation report evidence lookup failed:', reportError);
+      return res.status(503).json({ error: 'Preuve indisponible.' });
+    }
+    const evidencePath = Array.isArray(report?.evidence_urls) ? report.evidence_urls[0] : null;
+    if (
+      typeof evidencePath !== 'string' ||
+      !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.webp$/i.test(
+        evidencePath
+      )
+    ) {
+      return res.status(404).json({ error: 'Aucune preuve photo disponible.' });
+    }
+
+    const { data: image, error: downloadError } = await db.storage
+      .from(CHAT_MEDIA_BUCKET)
+      .download(evidencePath);
+    if (downloadError || !image) {
+      console.error('Moderation report evidence download failed:', downloadError);
+      return res.status(503).json({ error: 'Preuve photo momentanément indisponible.' });
+    }
+    const imageBytes = Buffer.from(await image.arrayBuffer());
+    res.setHeader('Cache-Control', 'private, no-store, max-age=0');
+    res.setHeader('Content-Type', 'image/webp');
+    res.setHeader('Content-Length', imageBytes.byteLength);
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    return res.status(200).send(imageBytes);
+  });
+
+  app.patch('/api/admin/reports/:reportId', verifySupabaseToken, requireAdmin, async (req, res) => {
+    const reportId = String(req.params.reportId || '');
+    const status = String(req.body?.status || '');
+    const action = String(req.body?.action || '');
+    const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    const allowedStatuses = new Set(['pending', 'investigating', 'resolved', 'dismissed']);
+    if (!uuidPattern.test(reportId) || !allowedStatuses.has(status)) {
+      return res.status(400).json({ error: 'Statut de signalement invalide.' });
+    }
+
+    try {
+      const db = serverSupabase.getServiceClient();
+      const { data: report, error: reportError } = await db
+        .from('reports')
+        .select('id,reported_id,description,category')
+        .eq('id', reportId)
+        .maybeSingle();
+      if (reportError) throw reportError;
+      if (!report) return res.status(404).json({ error: 'Signalement introuvable.' });
+
+      const { data, error } = await db
+        .from('reports')
+        .update({
+          status,
+          resolved_at: ['resolved', 'dismissed'].includes(status) ? new Date().toISOString() : null
+        })
+        .eq('id', reportId)
+        .select('id,status')
+        .single();
+      if (error) throw error;
+
+      if (status === 'resolved' && action === 'suspend') {
+        const { error: suspensionError } = await db
+          .from('profiles')
+          .update({ is_suspended: true, updated_at: new Date().toISOString() })
+          .eq('id', report.reported_id);
+        if (suspensionError) throw suspensionError;
+        const { error: sanctionError } = await db.from('sanctions').insert({
+          user_id: report.reported_id,
+          admin_id: String((req as any).userId),
+          sanction_type: 'suspension',
+          reason: report.description || report.category
+        });
+        if (sanctionError) throw sanctionError;
+      }
+
+      const { error: actionError } = await db.from('admin_actions').insert({
+        admin_id: String((req as any).userId),
+        target_user_id: report.reported_id,
+        action_type: `report_${status}`,
+        description: `Signalement ${status}`,
+        reason: report.description || report.category
+      });
+      if (actionError) throw actionError;
+      return res.json({ success: true, report: data });
+    } catch (error) {
+      console.error('Admin report update failed:', error);
+      return res.status(503).json({ error: 'Impossible de mettre à jour le signalement.' });
     }
   });
 

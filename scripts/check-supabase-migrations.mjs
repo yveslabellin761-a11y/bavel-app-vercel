@@ -40,7 +40,9 @@ const expected = [
   '32_monetization_rls_hardening.sql',
   '33_remove_client_bypass_privileges.sql',
   '34_activity_messages_policy_repair.sql',
-  '35_payment_catalog_and_gamification_rewards.sql'
+  '35_payment_catalog_and_gamification_rewards.sql',
+  '36_private_chat_safety_actions.sql',
+  '37_private_chat_report_unmatch.sql'
 ];
 
 const missing = expected.filter((file) => !fs.existsSync(path.join(migrationDir, file)));
@@ -126,6 +128,11 @@ const resources = [
       'created_at'
     ],
     migration: 'supabase/23_discovery_and_chat_hardening.sql'
+  },
+  {
+    table: 'message_user_hides',
+    columns: ['message_id', 'user_id', 'hidden_at'],
+    migration: 'supabase/36_private_chat_safety_actions.sql'
   },
   {
     table: 'blocks',

@@ -33,6 +33,7 @@ export interface Report {
   status: 'pending' | 'resolved' | 'dismissed' | 'investigating';
   priority: 'low' | 'medium' | 'high';
   category: 'fake_profile' | 'harassment' | 'spam' | 'inappropriate' | 'scam' | 'other';
+  hasImageEvidence?: boolean;
 }
 
 export interface ActivityLog {
@@ -3672,6 +3673,35 @@ const ReportCard: React.FC<{
   isDark: boolean;
   onResolve: (action: 'suspend' | 'dismiss' | 'warn' | 'investigate') => void;
 }> = ({ report, isDark, onResolve }) => {
+  const [evidenceUrl, setEvidenceUrl] = useState<string | null>(null);
+  const [evidenceError, setEvidenceError] = useState<string | null>(null);
+  const [loadingEvidence, setLoadingEvidence] = useState(false);
+
+  useEffect(() => () => {
+    if (evidenceUrl) URL.revokeObjectURL(evidenceUrl);
+  }, [evidenceUrl]);
+
+  const handleEvidenceClick = async () => {
+    if (evidenceUrl) {
+      setEvidenceUrl(null);
+      return;
+    }
+    setLoadingEvidence(true);
+    setEvidenceError(null);
+    try {
+      const response = await authFetch(`/api/admin/reports/${encodeURIComponent(report.id)}/evidence`);
+      if (!response.ok || !response.headers.get('Content-Type')?.startsWith('image/')) {
+        const payload = await response.json().catch(() => null);
+        throw new Error(payload?.error || 'Preuve photo indisponible.');
+      }
+      setEvidenceUrl(URL.createObjectURL(await response.blob()));
+    } catch (error) {
+      setEvidenceError(error instanceof Error ? error.message : 'Preuve photo indisponible.');
+    } finally {
+      setLoadingEvidence(false);
+    }
+  };
+
   return (
     <div className={cn(
       "p-4 rounded-2xl border space-y-3",
@@ -3683,6 +3713,27 @@ const ReportCard: React.FC<{
         </span>
         <span className="text-[11px] text-gray-500">{report.date}</span>
       </div>
+
+      {report.hasImageEvidence && (
+        <div className="space-y-2">
+          <button
+            type="button"
+            onClick={() => void handleEvidenceClick()}
+            disabled={loadingEvidence}
+            className="text-[11px] font-bold text-rose-300 hover:text-rose-200 disabled:opacity-60"
+          >
+            {loadingEvidence ? 'Chargement de la preuve…' : evidenceUrl ? 'Masquer la preuve photo' : 'Afficher la preuve photo'}
+          </button>
+          {evidenceUrl && (
+            <img
+              src={evidenceUrl}
+              alt="Preuve photo du signalement"
+              className="max-h-64 max-w-full rounded-xl border border-white/10 object-contain"
+            />
+          )}
+          {evidenceError && <p role="alert" className="text-[11px] text-rose-300">{evidenceError}</p>}
+        </div>
+      )}
 
       <div className="flex items-center space-x-2 text-[12.5px]">
         <span className="text-gray-400">Signalé par:</span>

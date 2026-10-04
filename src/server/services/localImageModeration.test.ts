@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import sharp from 'sharp';
 import {
+  createBlurredPrivateImagePreview,
   evaluateImagePredictions,
   ImageModerationError,
   moderateImageLocally,
@@ -71,6 +72,19 @@ describe('Bavel local image moderation', () => {
     assert.equal(metadata.format, 'webp');
     assert.equal(metadata.width, 32);
     assert.equal(metadata.height, 24);
+  });
+
+  it('creates a separate blurred WebP preview instead of exposing the original pixels', async () => {
+    const original = await sharp({
+      create: { width: 64, height: 48, channels: 3, background: '#e80000' },
+    }).png().toBuffer();
+    const preview = await createBlurredPrivateImagePreview(original);
+    const metadata = await sharp(preview).metadata();
+
+    assert.equal(metadata.format, 'webp');
+    assert.equal(metadata.width, 64);
+    assert.equal(metadata.height, 48);
+    assert.notDeepEqual(preview, original);
   });
 
   it('loads the pinned model and performs CPU inference with locally hosted weights', async () => {

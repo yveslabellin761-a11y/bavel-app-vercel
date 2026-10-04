@@ -38,10 +38,13 @@ Les URL `vercel.app` et `onrender.com` sont des domaines de démarrage attribué
 6. La migration 35 rend le catalogue de paiement serveur, assure l’idempotence de la confirmation des commandes et crédite les quêtes uniquement après vérification des photos, de la bio ou des swipes enregistrés. Son application et les privilèges de ses fonctions sont vérifiés; les parcours réels de paiement et de récompense restent à tester.
 7. `scripts/verify-supabase-rls.sql` contrôle aussi les privilèges d’écriture de `spatial_ref_sys` dans `public` ou `extensions`. Exécutez-le; la sortie attendue est vide.
 8. La migration selfie a été appliquée et `npm run check:migrations` est passé. Rejouez `scripts/verify-supabase-rls.sql` avant publication; le contrôle exécuté après migration n’a retourné aucun constat.
+9. La migration `36_private_chat_safety_actions.sql` a été appliquée et vérifiée le 4 octobre 2026. Elle ajoute le masquage individuel des messages, les opérations de signalement/blocage réservées au serveur et la conservation de la preuve jusqu’à la clôture du signalement.
 
 La liste initiale de versions de migrations Supabase était vide alors que la base contenait déjà des tables. Les réparations ont donc été exécutées explicitement, sans rejouer l’historique à l’aveugle. **Sauvegardez la base et examinez chaque migration historique avant de la rejouer.** La migration 30 vérifie maintenant le déplacement sécurisé de PostGIS; elle n’active pas RLS sur la table d’extension.
 
 Le contrôle RLS doit maintenant être vide. Le script `npm run check:migrations` vérifie des colonnes et des buckets, mais ne remplace pas `scripts/verify-supabase-rls.sql`.
+
+Les photos signalées sensibles sont servies en aperçu flouté généré côté serveur; l’original n’est retourné qu’après une demande explicite d’affichage. Le classifieur local reste probabiliste, peut produire des faux positifs ou négatifs et ne reconnaît pas le consentement; il n’est pas le système propriétaire de Badoo. Les preuves photo restent privées pendant l’examen et leur nettoyage est mis en file à la clôture du signalement.
 
 ## 🔧 Étape 2: Configurer les variables d'environnement
 

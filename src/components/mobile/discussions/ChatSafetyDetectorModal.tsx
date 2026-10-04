@@ -1,13 +1,14 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { ShieldAlert, Eye, EyeOff, Flag, X, ShieldCheck, Lock } from 'lucide-react';
+import { ShieldAlert, Eye, EyeOff, Flag, X, ShieldCheck, Lock, Trash2 } from 'lucide-react';
 
 interface ChatSafetyDetectorModalProps {
   isOpen: boolean;
   message: any | null;
   onClose: () => void;
-  onConfirmReveal: (message: any) => void;
-  onReportPhoto?: (message: any) => void;
+  onConfirmReveal: (message: any) => Promise<void>;
+  onDeleteMessage: (message: any) => Promise<void>;
+  onReportPhoto: (message: any) => Promise<void>;
 }
 
 export const ChatSafetyDetectorModal: React.FC<ChatSafetyDetectorModalProps> = ({
@@ -15,9 +16,30 @@ export const ChatSafetyDetectorModal: React.FC<ChatSafetyDetectorModalProps> = (
   message,
   onClose,
   onConfirmReveal,
+  onDeleteMessage,
   onReportPhoto,
 }) => {
+  const [busyAction, setBusyAction] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setBusyAction(null);
+    setActionError(null);
+  }, [isOpen, message?.id]);
+
   if (!isOpen || !message) return null;
+
+  const runAction = async (action: string, handler: (selectedMessage: any) => Promise<void>) => {
+    setBusyAction(action);
+    setActionError(null);
+    try {
+      await handler(message);
+      if (action !== 'reveal') onClose();
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : 'Cette action a échoué.');
+      setBusyAction(null);
+    }
+  };
 
   return (
     <AnimatePresence>
@@ -32,6 +54,7 @@ export const ChatSafetyDetectorModal: React.FC<ChatSafetyDetectorModalProps> = (
           {/* Top Close Button */}
           <button
             onClick={onClose}
+            disabled={busyAction !== null}
             className="absolute top-4 right-4 p-2 rounded-full bg-gray-100 text-gray-500 hover:bg-gray-200 transition-colors cursor-pointer"
             aria-label="Fermer"
           >
@@ -56,7 +79,7 @@ export const ChatSafetyDetectorModal: React.FC<ChatSafetyDetectorModalProps> = (
 
           {/* Explanation Text */}
           <p className="text-[13px] text-gray-600 leading-relaxed font-medium mt-2 px-1">
-            L'IA autonome de sécurité Bavel a automatiquement flouté cette photo reçue. Elle présente une forte probabilité de nudité ou de contenu intime.
+            La classification automatique a signalé cette image comme potentiellement sensible. Son aperçu est flouté avant affichage.
           </p>
 
           {/* Blurred Thumbnail Box */}
@@ -85,38 +108,47 @@ export const ChatSafetyDetectorModal: React.FC<ChatSafetyDetectorModalProps> = (
           <div className="flex flex-col w-full space-y-2.5">
             {/* Primary Reveal Button */}
             <button
-              onClick={() => {
-                onConfirmReveal(message);
-                onClose();
-              }}
+              disabled={busyAction !== null}
+              onClick={() => void runAction('reveal', onConfirmReveal)}
               className="w-full bg-gradient-to-r from-purple-600 via-pink-600 to-rose-600 text-white font-extrabold text-[14px] py-3.5 rounded-2xl shadow-lg shadow-purple-500/20 active:scale-[0.98] transition-all cursor-pointer flex items-center justify-center space-x-2"
             >
               <Eye className="w-4.5 h-4.5" />
-              <span>Afficher la photo</span>
+              <span>{busyAction === 'reveal' ? 'Chargement sécurisé…' : 'Afficher la photo'}</span>
             </button>
 
-            {/* Secondary Report Button */}
-            {onReportPhoto && (
-              <button
-                onClick={() => {
-                  onReportPhoto(message);
-                  onClose();
-                }}
-                className="w-full bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-[13px] py-3 rounded-2xl border border-rose-200 active:scale-[0.98] transition-all cursor-pointer flex items-center justify-center space-x-1.5"
-              >
-                <Flag className="w-4 h-4 text-rose-600" />
-                <span>Signaler cette photo</span>
-              </button>
-            )}
+            <button
+              disabled={busyAction !== null}
+              onClick={() => void runAction('hide', onDeleteMessage)}
+              className="w-full bg-gray-100 hover:bg-gray-200 text-gray-800 font-bold text-[13px] py-3 rounded-2xl active:scale-[0.98] transition-all cursor-pointer flex items-center justify-center space-x-1.5 disabled:opacity-60"
+            >
+              <Trash2 className="w-4 h-4" />
+              <span>{busyAction === 'hide' ? 'Suppression…' : 'Supprimer pour moi'}</span>
+            </button>
+
+            <button
+              disabled={busyAction !== null}
+              onClick={() => void runAction('report', onReportPhoto)}
+              className="w-full bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-[13px] py-3 rounded-2xl border border-rose-200 active:scale-[0.98] transition-all cursor-pointer flex items-center justify-center space-x-1.5 disabled:opacity-60"
+            >
+              <Flag className="w-4 h-4 text-rose-600" />
+              <span>{busyAction === 'report' ? 'Signalement…' : 'Signaler et bloquer'}</span>
+            </button>
 
             {/* Cancel Keep Blurred Button */}
             <button
               onClick={onClose}
+              disabled={busyAction !== null}
               className="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold text-[13px] py-3 rounded-2xl active:scale-[0.98] transition-all cursor-pointer"
             >
               Garder la photo floutée
             </button>
           </div>
+
+          {actionError && (
+            <p role="alert" className="mt-3 text-[12px] font-semibold text-rose-700">
+              {actionError}
+            </p>
+          )}
 
           {/* Footer note */}
           <div className="mt-4 flex items-center space-x-1 text-[10.5px] text-gray-400 font-semibold">

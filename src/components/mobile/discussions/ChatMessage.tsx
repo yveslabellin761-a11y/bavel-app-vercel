@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { motion } from 'motion/react';
 import { Check, CheckCheck, Flag, Flame, Sparkles, Eye, Shield, MapPin, Phone, Video, Trash2 } from 'lucide-react';
 import { Message } from '../types';
@@ -29,8 +29,6 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
   isEphemeralViewing,
   onRequestRevealPrivateImage,
 }) => {
-  const [isImageRevealed, setIsImageRevealed] = useState(false);
-
   const renderContent = () => {
     switch (message.type) {
       case 'voice':
@@ -108,12 +106,8 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
           <motion.div 
             whileTap={{ scale: 0.97 }}
             onClick={() => {
-              if (message.isPrivateContent && !isImageRevealed) {
-                if (onRequestRevealPrivateImage) {
-                  onRequestRevealPrivateImage(message);
-                } else {
-                  setIsImageRevealed(true);
-                }
+              if (message.isPrivateContent) {
+                onRequestRevealPrivateImage?.(message);
               } else {
                 onPreviewImage?.(message.text || '');
               }
@@ -127,11 +121,11 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
                 src={message.text} 
                 alt="Image" 
                 className={`max-h-[200px] w-auto max-w-full rounded-[14px] object-cover transition-all duration-300 ${
-                  message.isPrivateContent && !isImageRevealed ? 'blur-2xl scale-110 brightness-75' : ''
+                  message.isPrivateContent ? 'blur-2xl scale-110 brightness-75' : ''
                 }`} 
                 referrerPolicy="no-referrer"
               />
-              {message.isPrivateContent && !isImageRevealed && (
+              {message.isPrivateContent && (
                 <div className="absolute inset-0 flex flex-col items-center justify-center p-3 text-center bg-black/40 backdrop-blur-md text-white rounded-[14px]">
                   <Shield className="w-7 h-7 text-rose-400 mb-1 fill-rose-500/20 stroke-[2.5]" />
                   <span className="text-[11.5px] font-extrabold text-rose-200">Private Detector™</span>

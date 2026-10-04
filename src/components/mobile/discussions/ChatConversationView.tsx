@@ -403,6 +403,14 @@ export function ChatConversationView({
       const client = getSupabase();
       if (!client) return;
       try {
+        const hiddenResponse = await authFetch(
+          `/api/messages/hidden?matchId=${encodeURIComponent(matchId)}`
+        );
+        const hiddenPayload = await hiddenResponse.json().catch(() => null);
+        if (!hiddenResponse.ok || !Array.isArray(hiddenPayload?.messageIds)) {
+          throw new Error(hiddenPayload?.error || 'Messages masqués indisponibles.');
+        }
+        const hiddenMessageIds = new Set(hiddenPayload.messageIds.map(String));
         const { data, error } = await client
           .from('messages')
           .select('*')
@@ -414,8 +422,11 @@ export function ChatConversationView({
           return;
         }
 
-        if (data && data.length > 0) {
-          const hydratedMessages = await Promise.all(data.map(async (m: any) => {
+        const visibleMessages = (data || []).filter((message: any) =>
+          !hiddenMessageIds.has(String(message.id))
+        );
+        if (visibleMessages.length > 0) {
+          const hydratedMessages = await Promise.all(visibleMessages.map(async (m: any) => {
             const messageContent = m.content || m.text || '';
             const isGif = messageContent.startsWith('[GIF] ');
             const messageType = isGif
@@ -431,11 +442,14 @@ export function ChatConversationView({
             if (messageType === 'image' && m.media_url && !isEphemeral) {
               try {
                 const mediaResponse = await authFetch(`/api/messages/${encodeURIComponent(m.id)}/media-url`);
-                const mediaPayload = await mediaResponse.json().catch(() => null);
                 if (!mediaResponse.ok) {
+                  const mediaPayload = await mediaResponse.json().catch(() => null);
                   throw new Error(mediaPayload?.error || 'Image indisponible.');
                 }
-                text = mediaPayload.url;
+                if (!mediaResponse.headers.get('Content-Type')?.startsWith('image/')) {
+                  throw new Error('Le serveur n’a pas renvoyé une image valide.');
+                }
+                text = createChatImageObjectUrl(await mediaResponse.blob());
               } catch (error) {
                 console.error(`Chat image ${m.id} could not be loaded:`, error);
                 text = '';
@@ -464,11 +478,11 @@ export function ChatConversationView({
               duration: m.duration,
               isEphemeral,
               isViewed: Boolean(m.media_viewed_at || !m.media_url),
-              isPrivateContent: Boolean(m.is_private_content)
+              isPrivateContent: Boolean(m.is_private_content && m.receiver_id === currentUserId)
             };
           }));
           if (active) setMessages(hydratedMessages);
-        } else if (initialMsgs && initialMsgs.length > 0) {
+        } else if (data?.length === 0 && initialMsgs && initialMsgs.length > 0) {
           if (active) setMessages(initialMsgs.map((m: any, index: number) => ({
             id: index + 1,
             text: m.text,
@@ -510,6 +524,51 @@ export function ChatConversationView({
       }
     };
   }, [matchId, currentUserId, profile.initialMessage, profile.name]);
+
+  const handleRevealPrivateImage = async (message: any) => {
+    const response = await authFetch(
+      `/api/messages/${encodeURIComponent(message.id)}/media-url?reveal=1`
+    );
+    if (!response.ok || !response.headers.get('Content-Type')?.startsWith('image/')) {
+      const payload = await response.json().catch(() => null);
+      throw new Error(payload?.error || 'La photo originale ne peut pas être chargée.');
+    }
+    const imageUrl = createChatImageObjectUrl(await response.blob());
+    setMessages(prev => prev.map(item => item.id === message.id ? { ...item, text: imageUrl } : item));
+    setRevealedPrivateImages(prev => ({ ...prev, [message.id]: true }));
+    setPreviewImageUrl(imageUrl);
+    setPrivateDetectorMsg(null);
+  };
+
+  const handleHidePrivateImage = async (message: any) => {
+    const response = await authFetch(`/api/messages/${encodeURIComponent(message.id)}/hide`, {
+      method: 'DELETE'
+    });
+    const payload = await response.json().catch(() => null);
+    if (!response.ok) throw new Error(payload?.error || 'Le message n’a pas pu être supprimé.');
+    setMessages(prev => prev.filter(item => item.id !== message.id));
+    setPrivateDetectorMsg(null);
+    setFeedbackToast('Photo supprimée de votre conversation.');
+    setTimeout(() => setFeedbackToast(null), 3500);
+  };
+
+  const handleReportPrivateImage = async (message: any) => {
+    const response = await authFetch(
+      `/api/messages/${encodeURIComponent(message.id)}/private-report`,
+      { method: 'POST' }
+    );
+    const payload = await response.json().catch(() => null);
+    if (!response.ok) {
+      throw new Error(payload?.error || 'Le signalement n’a pas pu être enregistré.');
+    }
+    setMessages(prev => prev.filter(item => item.id !== message.id));
+    setPrivateDetectorMsg(null);
+    setFeedbackToast('Photo signalée et utilisateur bloqué.');
+    setTimeout(() => {
+      setFeedbackToast(null);
+      onClose?.();
+    }, 2500);
+  };
 
   const [inputText, setInputText] = useState('');
   const [selectedMessageForAction, setSelectedMessageForAction] = useState<any | null>(null);
@@ -655,6 +714,12 @@ export function ChatConversationView({
   const [viewingEphemeralMsg, setViewingEphemeralMsg] = useState<any | null>(null);
   const [ephemeralSeconds, setEphemeralSeconds] = useState(5);
   const ephemeralImageUrlRef = useRef<string | null>(null);
+  const chatImageObjectUrlsRef = useRef(new Set<string>());
+  const createChatImageObjectUrl = (image: Blob) => {
+    const url = URL.createObjectURL(image);
+    chatImageObjectUrlsRef.current.add(url);
+    return url;
+  };
   const [pickerTab, setPickerTab] = useState<'emoji' | 'gif'>('emoji');
 
   const GIPHY_PRESETS = [
@@ -1249,6 +1314,8 @@ export function ChatConversationView({
       URL.revokeObjectURL(ephemeralImageUrlRef.current);
       ephemeralImageUrlRef.current = null;
     }
+    for (const url of chatImageObjectUrlsRef.current) URL.revokeObjectURL(url);
+    chatImageObjectUrlsRef.current.clear();
   }, []);
 
   const handleSendQuestion = async (questionText: string) => {
@@ -1386,16 +1453,31 @@ export function ChatConversationView({
 
       const savedMessage = data?.message;
       if (!savedMessage?.id) throw new Error('Le serveur n’a pas confirmé l’enregistrement de l’image.');
+      let imageUrl = '';
+      if (!isEphemeralPhoto) {
+        try {
+          const mediaResponse = await authFetch(`/api/messages/${encodeURIComponent(savedMessage.id)}/media-url`);
+          if (!mediaResponse.ok || !mediaResponse.headers.get('Content-Type')?.startsWith('image/')) {
+            const payload = await mediaResponse.json().catch(() => null);
+            throw new Error(payload?.error || 'L’image envoyée ne peut pas être chargée.');
+          }
+          imageUrl = createChatImageObjectUrl(await mediaResponse.blob());
+        } catch (error) {
+          console.error('Sent chat image could not be displayed:', error);
+          setFeedbackToast('Image envoyée, mais son aperçu n’est pas disponible pour le moment.');
+          setTimeout(() => setFeedbackToast(null), 4000);
+        }
+      }
       const added = {
         id: savedMessage.id,
-        text: isEphemeralPhoto ? '' : String(data.mediaUrl || ''),
+        text: imageUrl,
         sender: 'me' as const,
         time: new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }),
         type: 'image' as const,
         status: 'sent' as const,
         isEphemeral: isEphemeralPhoto,
         isViewed: false,
-        isPrivateContent: Boolean(data.moderation?.blurRequired || data.moderation?.isPrivateContent)
+        isPrivateContent: false
       };
       setMessages(prev => prev.some(message => message.id === added.id) ? prev : [...prev, added]);
     } catch (error) {
@@ -3767,15 +3849,9 @@ export function ChatConversationView({
         isOpen={Boolean(privateDetectorMsg)}
         message={privateDetectorMsg}
         onClose={() => setPrivateDetectorMsg(null)}
-        onConfirmReveal={(msgToReveal) => {
-          setRevealedPrivateImages(prev => ({ ...prev, [msgToReveal.id]: true }));
-          setPreviewImageUrl(msgToReveal.text || null);
-          setPrivateDetectorMsg(null);
-        }}
-        onReportPhoto={() => {
-          setPrivateDetectorMsg(null);
-          handleOpenBlockAndReport();
-        }}
+        onConfirmReveal={handleRevealPrivateImage}
+        onDeleteMessage={handleHidePrivateImage}
+        onReportPhoto={handleReportPrivateImage}
       />
 
       {/* Recharge Credits Menu */}

@@ -45,6 +45,14 @@ export function getImageModelState(): ImageModelState {
   return modelState;
 }
 
+export function createBlurredPrivateImagePreview(image: Buffer): Promise<Buffer> {
+  return sharp(image, { limitInputPixels: MAX_IMAGE_PIXELS })
+    .resize(512, 512, { fit: 'inside', withoutEnlargement: true })
+    .blur(32)
+    .webp({ quality: 55 })
+    .toBuffer();
+}
+
 function modelDirectory(): string {
   const candidates = [
     path.join(process.cwd(), 'public', MODEL_RELATIVE_PATH),
