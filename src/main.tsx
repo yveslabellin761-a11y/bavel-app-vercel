@@ -4,6 +4,7 @@ import App from './App.tsx';
 import './index.css';
 import * as Sentry from '@sentry/react';
 import { ErrorBoundary } from './components/shared/ErrorBoundary';
+import { SpeedInsights } from '@vercel/speed-insights/react';
 
 const sentryDsn = import.meta.env.VITE_SENTRY_DSN;
 if (sentryDsn) {
@@ -18,6 +19,7 @@ createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <ErrorBoundary>
       <App />
+      <SpeedInsights />
     </ErrorBoundary>
   </StrictMode>
 );
